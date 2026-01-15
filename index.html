@@ -1,0 +1,2126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>项目履约监控看板 (v20.3.2 Governance)</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <style>
+        /* --- 核心配色 --- */
+        :root {
+            --primary: #13c2c2;
+            --primary-hover: #36cfc9;
+            --primary-light: #e6fffb;
+            --secondary: #722ed1;
+            --bg: #f5f7fa;
+            --card-bg: #ffffff;
+            --text-main: #262626;
+            --text-sub: #8c8c8c;
+            --border: #e8e8e8;
+            --danger: #ff4d4f;
+            --success: #52c41a;
+            --warning: #faad14;
+
+            /* L-Level Colors */
+            --p1-color: #f5222d;
+            --p2-color: #fa8c16;
+            --p3-color: #1890ff;
+            --p4-color: #bfbfbf;
+            --p5-color: #595959;
+            
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+        }
+    
+        body { 
+            font-family: -apple-system, "Microsoft YaHei", "Segoe UI", sans-serif; 
+            background: var(--bg); color: var(--text-main); 
+            margin: 0; padding: 8px; /* Compact: Reduced padding */
+            line-height: 1.4; font-size: 13px; /* Compact: Smaller base font */
+        }
+        .container { max-width: 100%; margin: 0 auto; overflow-x: hidden; }
+    
+        /* Header */
+        header { 
+            background: var(--card-bg); padding: 8px 16px; /* Compact */
+            border-radius: 6px; 
+            box-shadow: var(--shadow-sm); display: flex; justify-content: space-between; 
+            align-items: center; margin-bottom: 8px; border-left: 4px solid var(--secondary); /* Compact */
+            flex-wrap: nowrap; gap: 16px; overflow: hidden; white-space: nowrap;
+        }
+        h1 { 
+            margin: 0; font-size: 18px; /* Compact */
+            font-weight: 800; color: #002329; 
+            display: flex; align-items: center; gap: 10px; letter-spacing: -0.5px; 
+            flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; 
+        }
+        .subtitle { 
+            font-size: 11px; color: #fff; background: var(--p1-color); padding: 2px 6px; /* Compact */
+            border-radius: 4px; font-weight: 600; text-transform: uppercase; margin-left: 5px;
+            box-shadow: 0 2px 4px rgba(245, 34, 45, 0.3);
+        }
+    
+        .header-controls { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        
+        .btn { 
+            border: none; padding: 4px 10px; /* Compact */
+            border-radius: 4px; cursor: pointer; 
+            font-size: 12px; font-weight: 600; transition: all 0.3s; 
+            display: inline-flex; align-items: center; gap: 4px; 
+            white-space: nowrap; outline: none;
+        }
+        .btn:active { transform: scale(0.96); }
+        .btn-primary { background: linear-gradient(135deg, #36cfc9 0%, #13c2c2 100%); color: #fff; box-shadow: 0 2px 6px rgba(19, 194, 194, 0.2); }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(19, 194, 194, 0.3); }
+        .btn-outline { background: #fff; border: 1px solid #d9d9d9; color: #595959; }
+        .btn-outline:hover { color: var(--primary); border-color: var(--primary); background: var(--primary-light); }
+        .btn-outline:disabled { opacity: 0.5; cursor: not-allowed; background: #f5f5f5; color: #ccc; border-color: #eee; }
+        .btn-danger { background: #fff; border: 1px solid #ffbb96; color: var(--danger); }
+        .btn-danger:hover { background: #fff2e8; border-color: var(--danger); }
+        .btn-dark { background: #34495e; color: #fff; }
+        .btn-dark:hover { background: #2c3e50; }
+    
+        .section { 
+            background: var(--card-bg); padding: 10px; /* Compact */
+            border-radius: 6px; box-shadow: var(--shadow-sm); 
+            margin-bottom: 8px; /* Compact */
+            border: 1px solid #f0f0f0; position: relative; 
+        }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+        .section-title { font-size: 14px; /* Compact */ font-weight: 700; border-left: 3px solid var(--primary); padding-left: 8px; color: #262626; display: flex; align-items: center; gap: 8px; }
+        .section-tag { font-size: 10px; background: #f0f0f0; color: #666; padding: 1px 5px; border-radius: 4px; font-weight: normal; margin-left: 8px; }
+    
+        .chart-container { display: flex; gap: 10px; height: 360px; /* Compact: Reduced height */ }
+        .chart-wrapper { flex: 1; display: flex; flex-direction: column; border: 1px solid #f0f0f0; border-radius: 6px; background: #fff; overflow: hidden; transition: 0.3s; }
+        .chart-wrapper:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.05); border-color: #d9d9d9; }
+        .chart-box { flex: 1; padding: 8px; min-height: 0; }
+        .chart-footer { background: #fafafa; border-top: 1px solid #eee; padding: 6px 10px; font-size: 11px; color: var(--text-sub); } /* Compact */
+        .chart-footer h4 { margin: 0 0 4px 0; font-size: 12px; color: #333; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+    
+        .collapse-bar { background: #fff; border: 1px dashed #d9d9d9; color: var(--primary); padding: 4px; text-align: center; border-radius: 4px; cursor: pointer; font-weight: 700; font-size: 12px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.3s; }
+        .collapse-bar:hover { background: var(--primary-light); border-color: var(--primary); }
+        .advanced-zone { display: none; margin-bottom: 8px; }
+        .grid-2x2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    
+        .table-container {
+            max-height: 75vh; 
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.02);
+        }
+    
+        /* 强制不换行，开启横向滚动 */
+        table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; /* Compact */ background: #fff; table-layout: fixed; }
+        
+        thead th { 
+            background: #fafafa; padding: 6px 8px; /* Compact */
+            text-align: left; 
+            border-bottom: 1px solid var(--border); border-right: 1px solid #f0f0f0; 
+            color: #595959; font-weight: 600; cursor: pointer; white-space: nowrap; 
+            position: sticky; top: 0; z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        td { padding: 4px 8px; /* Compact */ border-bottom: 1px solid #f0f0f0; color: #262626; vertical-align: middle; border-right: 1px solid #fafafa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        tbody tr:hover { background-color: #e6fffb !important; }
+        .row-meltdown td { background-color: #fff1f0 !important; color: #cf1322 !important; font-weight: 700; }
+        
+        .row-stale td { 
+            background-color: #fdf5e6 !important; 
+            color: #595959 !important;
+        }
+        .row-stale td .tag-blue {
+            background-color: #d9d9d9; color: #595959; border-color: #b7b7b7; text-decoration: line-through;
+        }
+        .stale-badge {
+            font-size: 10px; color: #d46b08; border: 1px solid #d46b08; padding: 0px 2px; /* Compact */
+            border-radius: 3px; margin-left: 4px; vertical-align: text-bottom; cursor: help; font-weight: normal;
+        }
+    
+        /* --- New Checkbox & Code Styles --- */
+        .check-col { width: 30px; text-align: center; }
+        .clickable-code {
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .clickable-code:hover {
+            color: var(--secondary);
+            text-decoration: underline;
+            background-color: #f9f0ff;
+        }
+        .clickable-code:hover::after {
+            content: '✎';
+            position: absolute;
+            right: 4px;
+            font-size: 10px;
+            color: var(--secondary);
+        }
+        
+        .summary-cell-split { display: flex; flex-direction: column; gap: 2px; white-space: nowrap; }
+        .p-stat-row { display: flex; gap: 4px; font-size: 10px; align-items: center; flex-wrap: nowrap; }
+        .p-tag { padding: 0px 4px; border-radius: 3px; font-weight: 700; }
+        .p-tag.active { background: #fff1f0; color: var(--danger); border: 1px solid #ffccc7; }
+        .p-tag.normal { color: #666; }
+        .inventory-row { border-top: 1px dashed #eee; margin-top: 6px; padding-top: 6px; font-size: 12px; color: #888; display: flex; justify-content: space-between; align-items: center;}
+        .inventory-alert { background: #fffbe6; color: #d48806; padding: 1px 4px; border-radius: 4px; font-weight: bold; }
+        
+        .dual-score-cell { display: flex; flex-direction: column; gap: 2px; font-family: monospace; white-space: nowrap; }
+        .score-row { display: flex; justify-content: space-between; align-items: center; background: #f9f9f9; padding: 1px 4px; border-radius: 4px; }
+        .score-label { font-size: 10px; color: #888; margin-right: 6px; }
+        .score-val { font-weight: 900; font-size: 12px; cursor: pointer; }
+        .score-val:hover { background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.1); color: var(--primary); }
+    
+        .result-cell { display: flex; flex-direction: column; gap: 2px; font-size: 11px; white-space: nowrap; }
+        .result-item { display: flex; align-items: center; gap: 4px; }
+    
+        .th-inner { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 4px; }
+        .filter-btn { font-size: 10px; padding: 1px 3px; color: #bfbfbf; border-radius: 2px; transition: all 0.2s; }
+        .filter-btn:hover { background: #eee; color: var(--primary); }
+        .filter-active { color: var(--primary) !important; font-weight: 900; background: var(--primary-light); }
+        
+        .sort-icon { display: inline-block; width: 12px; text-align: center; margin-left: 2px; }
+        .sort-icon::after { content: "⇅"; color: #ddd; font-size: 10px; font-weight: normal; }
+        .sort-asc::after { content: "▲"; color: var(--primary); font-weight: 900; }
+        .sort-desc::after { content: "▼"; color: var(--primary); font-weight: 900; }
+    
+        .tag { padding: 1px 6px; border-radius: 4px; font-size: 11px; display: inline-block; font-weight: 500; }
+        .tag-blue { background: #e6fffb; color: #006d75; border: 1px solid #87e8de; }
+        .tag-green { background: #f6ffed; color: #389e0d; border: 1px solid #b7eb8f; }
+        .tag-gray { background: #f5f5f5; color: #8c8c8c; border: 1px solid #d9d9d9; }
+        .tag-red { background: #fff1f0; color: #f5222d; border: 1px solid #ffa39e; }
+        .tag-purple { background: #f9f0ff; color: #722ed1; border: 1px solid #d3adf7; }
+        .tag-teal { background: #e6fffb; color: #13c2c2; border: 1px solid #87e8de; }
+        .tag-geekblue { background: #f0f5ff; color: #2f54eb; border: 1px solid #adc6ff; }
+        .tag-cyan { background: #e6fffb; color: #006d75; border: 1px solid #5cdbd3; }
+        
+        .l-badge { padding: 2px 6px; border-radius: 3px; font-weight: 800; font-size: 11px; color: #fff; display: inline-block; min-width: 26px; text-align: center; }
+        .l-p1 { background: var(--p1-color); box-shadow: 0 2px 4px rgba(245, 34, 45, 0.3); }
+        .l-p2 { background: var(--p2-color); }
+        .l-p3 { background: var(--p3-color); }
+        .l-p4 { background: var(--p4-color); }
+        .l-p5 { background: var(--p5-color); text-decoration: line-through; }
+        
+        /* New Legend Tags for Charts */
+        .dot { display: inline-block; width:6px; height:6px; border-radius:50%; margin-right:3px; }
+        .rect-mark { display: inline-block; width:8px; height:8px; border-radius:2px; margin-right:3px; vertical-align:middle; }
+        
+        .team-stats-row {
+            display: flex; gap: 8px; margin-top: 8px; margin-bottom: 8px; align-items: center;
+        }
+        .team-stat-bar {
+            flex: 1; background: #fff; border: 1px solid #e8e8e8; border-radius: 4px;
+            padding: 0 12px; height: 32px; /* Compact */
+            display: flex; align-items: center; justify-content: space-between;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02); transition: 0.2s;
+        }
+        .team-stat-bar:hover { border-color: var(--primary); }
+        .ts-label { font-size: 11px; font-weight: 700; color: #666; display: flex; align-items: center; gap: 6px; }
+        .ts-value { font-size: 14px; font-weight: 900; font-family: monospace; color: #333; }
+        
+        .grade-text-s { color: var(--success); font-weight:900; }
+        .grade-text-a { color: var(--primary); font-weight:900; }
+        .grade-text-c { color: var(--warning); font-weight:900; }
+        .grade-text-d { color: var(--danger); font-weight:900; }
+    
+        input[type="text"], input[type="number"], input[type="date"], .form-input { padding: 4px 8px; border: 1px solid #d9d9d9; border-radius: 4px; outline: none; font-size: 12px; color: #262626; box-sizing: border-box; transition: 0.2s; width: 100%; }
+        input:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(19, 194, 194, 0.2); }
+        select { padding: 4px 8px; border: 1px solid #d9d9d9; border-radius: 4px; width: 100%; font-size: 12px; }
+        
+        .modal-mask { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.45); z-index: 1000; backdrop-filter: blur(2px); }
+        .modal { background: #fff; width: 700px; padding: 20px; border-radius: 8px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 10px 30px rgba(0,0,0,0.15); max-height: 90vh; overflow-y: auto; }
+        .mgmt-modal { width: 800px; padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+        
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .form-item { display: flex; flex-direction: column; }
+        .form-item.full { grid-column: span 2; }
+        .form-label { font-size: 11px; margin-bottom: 2px; color: #666; font-weight: 600; }
+        
+        .mgmt-header { padding: 12px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #fff; }
+        .mgmt-body { display: flex; height: 500px; }
+        .mgmt-sidebar { width: 220px; background: #f9f9f9; border-right: 1px solid #eee; padding: 12px 0; }
+        .mgmt-nav-item { padding: 10px 20px; cursor: pointer; color: #666; font-weight: 500; transition: 0.2s; border-left: 4px solid transparent; font-size: 13px; }
+        .mgmt-nav-item:hover { background: #f0f0f0; color: #333; }
+        .mgmt-nav-item.active { background: #fff; color: var(--primary); border-left-color: var(--primary); font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .mgmt-nav-item.danger-zone { color: var(--danger); }
+        .mgmt-nav-item.danger-zone.active { border-left-color: var(--danger); background: #fff1f0; }
+        .mgmt-content { flex: 1; padding: 20px; overflow-y: auto; display: none; }
+        .mgmt-content.active { display: block; animation: fadeIn 0.3s; }
+        .mgmt-card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .mgmt-card { border: 1px solid #eee; border-radius: 8px; padding: 16px; text-align: center; transition: 0.3s; background: #fff; }
+        .mgmt-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-color: var(--primary-hover); transform: translateY(-2px); }
+        .mgmt-icon { font-size: 20px; margin-bottom: 8px; display: block; }
+        .mgmt-h4 { font-size: 13px; font-weight: 700; margin-bottom: 6px; color: #333; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    
+        .manual-box { padding: 12px; font-size: 12px; background: #fff; border: 1px solid #f0f0f0; border-radius: 8px; line-height: 1.5; }
+        .manual-box h3 { margin-top: 12px; font-size: 13px; border-bottom: 2px solid var(--primary); padding-bottom: 2px; display: inline-block; color: #333; }
+        .manual-box h3:first-child { margin-top: 0; } 
+        .step-num { display: inline-block; width: 16px; height: 16px; background: var(--primary); color: #fff; text-align: center; line-height: 16px; border-radius: 50%; font-size: 10px; margin-right: 6px; font-weight: bold; }
+        .manual-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .manual-item ul { margin: 4px 0; padding-left: 16px; color: #666; }
+        
+        /* Updated Filter Menu Styles */
+        .filter-menu { display: none; position: absolute; background: #fff; z-index: 9999; border: 1px solid #eee; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: 4px; min-width: 160px; padding: 8px; max-height: 300px; overflow-y: auto; }
+        .filter-menu label { display: flex; align-items: center; gap: 6px; padding: 4px 8px; cursor: pointer; font-size: 12px; color: #333; transition: 0.2s; border-radius: 4px; }
+        .filter-menu label:hover { background: #f5f5f5; }
+        .filter-menu input[type="checkbox"] { margin: 0; }
+        .filter-actions { display: flex; justify-content: space-between; border-top: 1px solid #eee; padding-top: 8px; margin-top: 8px; }
+        .filter-actions button { border: 1px solid #d9d9d9; background: #fff; border-radius: 3px; font-size: 11px; padding: 2px 8px; cursor: pointer; }
+        .filter-actions button.confirm { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .filter-actions button:hover { opacity: 0.8; }
+        
+        .legend-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; align-items: center; }
+        .legend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #555; background: #fff; padding: 1px 4px; border-radius: 4px; border: 1px solid #f0f0f0; }
+        .legend-shape { width: 12px; height: 12px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; }
+        .shape-pin { width: 10px; height: 10px; border-radius: 50% 50% 0 50%; transform: rotate(45deg); background: var(--success); }
+        .shape-circle { width: 10px; height: 10px; border-radius: 50%; background: var(--primary); }
+        .shape-tri { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 10px solid var(--warning); }
+        .shape-rect { width: 10px; height: 10px; background: var(--danger); border-radius: 2px; }
+        .shape-cross { color: #cf1322; font-size: 12px; font-weight: 900; line-height: 1; }
+        
+        .chart-desc-text { font-size: 10px; color: #666; margin-top: 6px; line-height: 1.4; background: #f9f9f9; padding: 6px; border-radius: 4px; border: 1px solid #f0f0f0; }
+        .desc-row { display: flex; gap: 6px; margin-bottom: 2px; align-items: baseline; }
+        .desc-icon { width: 12px; text-align: center; display: inline-block; font-size: 11px; }
+        .desc-label { font-weight: 700; color: #333; min-width: 50px; }
+        
+        .radar-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: flex-start; font-size: 10px; color: #666; background: #fff; margin-bottom: 4px; }
+        .radar-legend-item { display: flex; align-items: center; gap: 3px; white-space: nowrap; }
+        
+        .chart-filter-bar {
+            background: #fffbe6; border: 1px solid #ffe58f; color: #d48806;
+            padding: 6px 10px; border-radius: 4px; margin-bottom: 8px;
+            display: none; align-items: center; justify-content: space-between;
+            font-size: 12px; font-weight: 600;
+        }
+        .chart-filter-bar button {
+            background: #fff; border: 1px solid #d48806; color: #d48806;
+            padding: 1px 6px; border-radius: 4px; cursor: pointer; font-size: 11px;
+        }
+        .chart-filter-bar button:hover { background: #fff1b8; }
+    
+        /* Time Filter Styles */
+        .time-filter-bar {
+            display: flex; align-items: center; gap: 10px;
+            background: #fff; padding: 8px 12px; border-radius: 6px;
+            border: 1px solid #e8e8e8; margin-top: 8px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        }
+        .time-label { font-size: 12px; font-weight: 700; color: #333; display: flex; align-items: center; gap: 6px; }
+        .date-input-group { display: flex; align-items: center; gap: 6px; background: #f5f7fa; padding: 2px 6px; border-radius: 4px; border: 1px solid #d9d9d9; }
+        .date-input-group input { border: none; background: transparent; padding: 1px; font-family: monospace; font-size: 12px; width: 100px; }
+        .separator { color: #999; font-weight: bold; font-size: 11px; }
+    </style>
+</head>
+<body onclick="closeAllPopups(event)">
+
+<div class="container">
+    <header>
+        <h1>🚀 项目履约监控看板 <span class="subtitle">v20.3.2 Governance</span></h1>
+        <div class="header-controls">
+            <!-- [New] Undo Button -->
+            <button class="btn btn-outline" id="btnUndo" onclick="undoLastAction()" disabled style="margin-right:8px;">↩ 撤销 (0)</button>
+
+            <input type="file" id="importFileJSON" accept=".json" onchange="importJSONFile(this)" style="display:none">
+            <input type="file" id="importFileExcel" accept=".xlsx, .xls" onchange="importExcelFile(this)" style="display:none">
+            <button class="btn btn-dark" onclick="openMgmtModal()">⚙️ 数据管理与设置</button>
+        </div>
+    </header>
+    
+    <!-- 核心图表区 -->
+    <div class="section">
+        <div class="section-title">
+            📊 绩效与能力全景图 (Manager/Team Level) 
+            <span class="section-tag">战略视角</span>
+        </div>
+        <div class="chart-container">
+            <!-- Scatter (Risk Matrix) -->
+            <div class="chart-wrapper">
+                <div id="chartScatter" class="chart-box"></div>
+                <div class="chart-footer">
+                    <h4><i>📐</i> 绩效矩阵 (Risk Scatter)</h4>
+                    <div class="legend-row" style="margin-bottom:8px;">
+                        <div class="legend-item"><div class="legend-shape shape-pin"></div> S级 (≥90)</div>
+                        <div class="legend-item"><div class="legend-shape shape-circle"></div> A/B级 (≥75)</div>
+                        <div class="legend-item"><div class="legend-shape shape-tri"></div> C级 (≥60)</div>
+                        <div class="legend-item"><div class="legend-shape shape-rect"></div> D级 (<60)</div>
+                        <div class="legend-item" style="border-color:#ffccc7; background:#fff1f0; color:#cf1322;">
+                            <div class="legend-shape shape-cross">✖</div> <b>事故 (0分)</b>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Radar (Capability) -->
+            <div class="chart-wrapper">
+                <div id="chartRadar" class="chart-box"></div>
+                <div class="chart-footer">
+                    <h4><i>🧬</i> 五维能力画像 (Capability)</h4>
+                    <div class="radar-legend">
+                        <div class="radar-legend-item">1.<b>进度绩效</b>: 交付平均分</div>
+                        <div class="radar-legend-item">2.<b>安全合规</b>: 无事故</div>
+                        <div class="radar-legend-item">3.<b>完结率</b>: 已完结/总数</div>
+                        <div class="radar-legend-item">4.<b>优良率</b>: ≥90分占比</div>
+                        <div class="radar-legend-item">5.<b>准时率</b>: 无延期占比</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 深度分析折叠区 -->
+    <div class="collapse-bar" onclick="toggleAdvanced()" id="collapseBtn">
+        <i>▼</i> 点击展开 / 收起：L-Level 精力分布 · 树图 · 桑基 · 甘特
+    </div>
+    <div class="advanced-zone" id="advancedZone">
+        <div class="section" style="border:1px dashed var(--primary); background:#fcfcfc;">
+            <div class="section-title" style="font-size:14px; border:none; color:var(--primary);">
+                🔍 深度诊断视图 (Energy Allocation) <span class="section-tag">战术视角</span>
+            </div>
+            <div class="grid-2x2">
+                
+                <!-- L-Level Energy Map -->
+                <div class="chart-wrapper">
+                    <div id="chartEnergy" class="chart-box" style="min-height:300px;"></div>
+                    <div class="chart-footer">
+                        <h4><i>🔋</i> 精力分配矩阵 (Energy Map)</h4>
+                        <div style="font-size:11px; margin-bottom:6px; display:flex; gap:8px;">
+                            <span><span class="dot" style="background:var(--p1-color)"></span>P1(最高)</span>
+                            <span><span class="dot" style="background:var(--p2-color)"></span>P2</span>
+                            <span><span class="dot" style="background:var(--p3-color)"></span>P3</span>
+                            <span><span class="dot" style="background:var(--p4-color)"></span>P4(挂起)</span>
+                            <span><span class="dot" style="background:var(--p5-color)"></span>P5(终止)</span>
+                        </div>
+                        <div class="chart-desc-text">
+                            <div class="desc-row">
+                                <span class="desc-icon">📈</span> 
+                                <span class="desc-label">图表解读：</span> 
+                                <span>这是你的<b>“精力雷达”</b>。每个点代表一个项目。<br>• <b>纵向(Y轴)</b>：得分。分数越高越安全。虚线(60分)为及格线。<br>• <b>横向(X轴)</b>：优先级。</span>
+                            </div>
+                            <div class="desc-row">
+                                <span class="desc-icon">💡</span> 
+                                <span class="desc-label">一眼看懂：</span> 
+                                <span>若有<b>红色点(P1)</b>掉在<b>虚线下方</b>，说明“救火级”项目正在烂尾，必须立刻干预！</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+    
+                <!-- Tree Map -->
+                <div class="chart-wrapper">
+                    <div id="chartTreeMap" class="chart-box" style="min-height:300px;"></div>
+                    <div class="chart-footer">
+                        <h4><i>🌳</i> 宏观树图 (Health Map)</h4>
+                        <div style="font-size:11px; margin-bottom:6px;">
+                            <span class="rect-mark" style="background:var(--success)"></span>优质(≥90)
+                            <span class="rect-mark" style="background:#00b5ad"></span>正常
+                            <span class="rect-mark" style="background:var(--warning)"></span>风险(&lt;60)
+                            <span class="rect-mark" style="background:var(--danger)"></span>事故
+                        </div>
+                        <div class="chart-desc-text">
+                            <div class="desc-row">
+                                <span class="desc-icon">🧱</span> 
+                                <span class="desc-label">图表解读：</span> 
+                                <span>这是<b>“时间成本”</b>地形图。<br>• <b>方块面积</b> = <b>工期长短</b>。面积越大，消耗团队时间越多。<br>• <b>颜色</b> = <b>健康度</b>。</span>
+                            </div>
+                            <div class="desc-row">
+                                <span class="desc-icon">💡</span> 
+                                <span class="desc-label">一眼看懂：</span> 
+                                <span>寻找<b>大面积的红色或黄色</b>色块。这意味着团队在一个巨大的项目上浪费时间，且产出极差，需及时止损。</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Sankey -->
+                <div class="chart-wrapper">
+                    <div id="chartSankey" class="chart-box" style="min-height:300px;"></div>
+                    <div class="chart-footer">
+                        <h4><i>🌊</i> 状态归因图 (Flow Analysis)</h4>
+                        <div class="chart-desc-text">
+                            <div class="desc-row">
+                                <span class="desc-icon">🔗</span> 
+                                <span class="desc-label">图表解读：</span> 
+                                <span>这是<b>“责任溯源”</b>追踪器。<br>• <b>流向</b>：[左]交付经理 ➔ [中]当前状态 ➔ [右]最终结果归因。</span>
+                            </div>
+                            <div class="desc-row">
+                                <span class="desc-icon">💡</span> 
+                                <span class="desc-label">一眼看懂：</span> 
+                                <span>盯住<b>红色的线条</b>（代表内因延期/事故）。顺着红线往回看，源头连着谁，就说明谁手里的项目因内部原因出了问题。</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Gantt -->
+                <div class="chart-wrapper">
+                    <div id="chartGantt" class="chart-box" style="min-height:300px;"></div>
+                    <div class="chart-footer">
+                        <h4><i>📅</i> 履约进度表 (Timeline)</h4>
+                        <div style="font-size:11px; margin-bottom:6px;">
+                             <span class="rect-mark" style="background:#3498db"></span>进行中
+                             <span class="rect-mark" style="background:#2ecc71"></span>已完结
+                             <span class="rect-mark" style="background:var(--danger)"></span>今日(红线)
+                        </div>
+                        <div class="chart-desc-text">
+                            <div class="desc-row">
+                                <span class="desc-icon">🛑</span> 
+                                <span class="desc-label">图表解读：</span> 
+                                <span>这是<b>“时间阻塞”</b>检测仪。<br>• <b>竖直红虚线</b>：代表<b>今天</b>。<br>• <b>条形堆叠</b>：同一行堆积太多条目代表<b>并发过载</b>。</span>
+                            </div>
+                            <div class="desc-row">
+                                <span class="desc-icon">💡</span> 
+                                <span class="desc-label">一眼看懂：</span> 
+                                <span>看哪些<b>蓝色条(进行中)</b>穿过了<b>红虚线(今天)</b>却还没变绿。这些就是已经超期但还没做完的项目。</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+    
+    <!-- 汇总表 -->
+    <div class="section">
+        <div class="section-title">🏆 交付经理考核汇总 (全视之眼 / All-Seeing Eye)</div>
+        
+        <!-- Time Filter Controls -->
+        <div class="time-filter-bar">
+            <div class="time-label">📅 考核周期筛选:</div>
+            <select id="timePreset" onchange="applyTimePreset()" class="form-input" style="width:160px; font-weight:600;">
+                <option value="currentQ">📅 当前季度 (默认)</option>
+                <option value="currentM">🗓️ 当前月份</option>
+                <option value="currentY">🌏 当前全年</option>
+                <option disabled>──────────</option>
+                <option value="q1">Q1 (第一季度)</option>
+                <option value="q2">Q2 (第二季度)</option>
+                <option value="q3">Q3 (第三季度)</option>
+                <option value="q4">Q4 (第四季度)</option>
+                <option disabled>──────────</option>
+                <option value="all">♾️ 全部时间 (All Time)</option>
+                <option value="custom">⚙️ 自定义范围</option>
+            </select>
+            
+            <div class="date-input-group">
+                <input type="date" id="filterStartDate" onchange="handleCustomDate()">
+                <span class="separator">➞</span>
+                <input type="date" id="filterEndDate" onchange="handleCustomDate()">
+            </div>
+            
+            <div style="font-size:12px; color:#888; margin-left:auto;">
+                * 统计逻辑：项目周期与所选时间段有重叠即计入
+            </div>
+        </div>
+    
+        <div id="teamStatsPanel" style="display:none;"></div>
+    
+        <div style="margin-top:12px;">
+            <table class="summary-table">
+                <thead>
+                    <tr>
+                        <th style="background:#f9f0ff; color:var(--secondary); border-bottom:2px solid #d3adf7; width:90px;">交付经理</th>
+                        <th style="width:240px;">🟢 战况 (资源/库存)</th>
+                        <th style="width:100px;">🏁 战果 (历史)</th>
+                        <th style="width:140px; color:var(--danger)">⚠️ 风险/进度管控</th>
+                        <th style="width:120px;">📋 内部考核双轨分</th>
+                        <th style="text-align:right; width:90px;">🏆 绩效</th>
+                    </tr>
+                </thead>
+                <tbody id="summaryBody"></tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- 明细台账 -->
+    <div class="section">
+        <div class="section-header">
+            <div class="section-title">📝 项目交付明细台账</div>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <!-- New Batch Delete Button -->
+                <button class="btn btn-danger" onclick="batchDelete()">🗑️ 批量删除</button>
+                <div style="width:1px; background:#e8e8e8; height:20px; margin:0 4px;"></div>
+    
+                <div style="position:relative; display:inline-block;">
+                    <input type="text" id="searchInput" placeholder="🔍 搜人、项目、编号..." oninput="handleSearchInput(this)" style="width:240px; padding-right:30px;">
+                    <span id="searchClear" onclick="clearSearch()" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer; color:#ccc; display:none; font-weight:bold;">&times;</span>
+                </div>
+                <button class="btn btn-primary" onclick="openProjectModal()">+ 新增项目</button>
+            </div>
+        </div>
+        <!-- Active Filter Bar -->
+        <div id="activeFilterBar" class="chart-filter-bar">
+            <span>🌪️ 当前视图筛选：<b id="filterLabel">--</b></span>
+            <button onclick="clearChartFilter()">清除筛选 [Esc]</button>
+        </div>
+        
+        <!-- Scrollable Table Container -->
+        <div class="table-container">
+            <table id="detailTable">
+                <thead>
+                    <tr>
+                        <th class="check-col"><input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)"></th>
+                        <th style="text-align:center; width:45px; min-width:45px;">#</th>
+                        <th style="width:90px; min-width:90px;" onclick="handleSort('manager')">
+                            <div class="th-inner">交付经理<span class="sort-icon" id="sort_manager"></span><span class="filter-btn" id="filter_icon_manager" onclick="toggleFilter(event, 'manager')">▼</span></div>
+                        </th>
+                        <th style="width:140px; min-width:140px;"> <!-- Increased width for new code format -->
+                            <div class="th-inner">商机编号(点击编辑)</div>
+                        </th>
+                        <th style="width:170px; min-width:170px;">项目名称</th> 
+                        <th style="width:95px; min-width:95px;" onclick="handleSort('startDate')"><div class="th-inner">开始<span class="sort-icon" id="sort_startDate"></span></div></th>
+                        <th style="width:95px; min-width:95px;" onclick="handleSort('endDate')"><div class="th-inner">结束<span class="sort-icon" id="sort_endDate"></span></div></th>
+                        <th style="width:100px; min-width:100px;" onclick="handleSort('status')">
+                            <div class="th-inner">状态<span class="sort-icon" id="sort_status"></span><span class="filter-btn" id="filter_icon_status" onclick="toggleFilter(event, 'status')">▼</span></div>
+                        </th>
+                        
+                        <!-- L-Level Updated to have Filter -->
+                        <th style="text-align:center; width:80px; min-width:80px;" onclick="handleSort('lLevel')">
+                            <div class="th-inner" style="justify-content:center">L-Level<span class="sort-icon" id="sort_lLevel"></span><span class="filter-btn" id="filter_icon_lLevel" onclick="toggleFilter(event, 'lLevel')">▼</span></div>
+                        </th>
+                        
+                        <th style="width:80px; min-width:80px;">审批</th>
+                        <th style="text-align:center; width:80px; min-width:80px;">内因/外因</th>
+                        <th style="width:80px; min-width:80px;" onclick="handleSort('score')"><div class="th-inner" style="justify-content:center">进度分<span class="sort-icon" id="sort_score"></span></div></th>
+                        <th style="width:80px; min-width:80px;">
+                            <div class="th-inner" style="justify-content:center">安全<span class="filter-btn" id="filter_icon_safety" onclick="toggleFilter(event, 'safety')">▼</span></div>
+                        </th>
+                        <th style="width:200px; min-width:200px;">备注</th>
+                        <!-- Action column removed -->
+                    </tr>
+                </thead>
+                <tbody id="detailBody"></tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Documentation Section -->
+    <div class="section">
+        <div class="section-title">📘 系统使用说明书 (完全版 v20.3 Smart Sync Ed.)</div>
+        <div class="manual-box">
+            <div style="border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:15px;">
+                <h2 style="font-size:18px; margin:0; color:#2c3e50; font-weight:800;">🚀 项目履约监控看板操作指南</h2>
+                <div style="font-size:12px; color:#666; margin-top:5px;">简单、直接、有效。拒绝废话。</div>
+            </div>
+            <div class="manual-grid">
+                <div class="manual-item">
+                    <h3>1. 数据同步与更新 (NEW - Smart Sync)</h3>
+                    <ul style="margin:0; padding-left:18px; line-height:1.6;">
+                        <li><strong>智能合并逻辑：</strong> 导入 Excel 或 JSON 备份时，系统会自动识别 <strong>商机编号</strong>：
+                            <ul style="margin:4px 0; font-size:12px; color:#666;">
+                                <li>✅ <strong>已存在：</strong> 自动更新进度、状态、备注（不会重复添加）。</li>
+                                <li>➕ <strong>不存在：</strong> 自动新增为新项目。</li>
+                            </ul>
+                        </li>
+                        <li><strong>分发与汇总：</strong> 经理们可只填自己的数据，总监统一汇总时选择“智能合并”即可。</li>
+                    </ul>
+    
+                    <h3 style="margin-top:15px;">2. L-Level 资源优先级协议</h3>
+                    <ul style="margin:0; padding-left:18px; line-height:1.6;">
+                        <li><span class="l-badge l-p1">P1</span> <strong>最高级 (Fire Fighting)</strong>: 救火项目。单人持有 >2 个即视为<span style="color:#fa8c16; font-weight:bold;">高负载</span>，建议分流。</li>
+                        <li><span class="l-badge l-p2">P2</span> <strong>重点 (High)</strong>: 核心交付项目，公司营收主力。</li>
+                        <li><span class="l-badge l-p3">P3</span> <strong>正常 (Normal)</strong>: 常规流程项目。</li>
+                        <li><span class="l-badge l-p4">P4</span> <strong>挂起 (Suspended)</strong>: 暂停。不占用当前资源，不计入 L-Load。</li>
+                        <li><span class="l-badge l-p5">P5</span> <strong>终止 (Terminated)</strong>: 项目死亡。</li>
+                    </ul>
+                </div>
+                <div class="manual-item">
+                     <h3>3. 每周填报 SOP (防健忘清单)</h3>
+                     <div style="background:#f9f9f9; padding:10px; border-radius:6px; border:1px dashed #ccc; margin-top:5px;">
+                        <ul class="manual-list" style="margin:0; padding-left:18px; line-height:1.8;">
+                            <li><strong>Step 1 查状态：</strong> 筛选你的名字，查看所有 [进行中] 项目。</li>
+                            <li><strong>Step 2 更延期：</strong> 只要本周进度滞后，立即增加 <span style="color:red">内因/外因延期数</span>。不要等月底再算账。</li>
+                            <li><strong>Step 3 调级别：</strong> 如果项目变成烂摊子，把 L-Level 升为 <span class="l-badge l-p1">P1</span>；如果客户暂停，改为 <span class="l-badge l-p4">P4</span>。</li>
+                            <li><strong>Step 4 存备份：</strong> 点击顶部 <button class="btn btn-dark" style="padding:0 4px; font-size:10px;">⚙️ 数据管理</button> -> <strong>[下载备份]</strong>。这步最重要！</li>
+                        </ul>
+                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="filterMenu" class="filter-menu"></div>
+
+<!-- Project Edit Modal -->
+<div class="modal-mask" id="modalOverlay">
+    <div class="modal" id="modalBox">
+        <div style="font-size:18px; font-weight:800; margin-bottom:16px; border-bottom:1px solid #e8e8e8; padding-bottom:10px; color:#333;">📋 编辑项目信息</div>
+        <input type="hidden" id="editIndex"> 
+        <div class="form-grid">
+            <div class="form-item"><label class="form-label">交付经理 *</label><input class="form-input" id="f_manager"></div>
+            <div class="form-item"><label class="form-label" style="color:var(--secondary); font-weight:bold;">商机编号 * (格式：K12345678L123456)</label><input class="form-input" id="f_code" placeholder="自动生成..."></div>
+            <div class="form-item full"><label class="form-label">项目名称 *</label><input class="form-input" id="f_name"></div>
+
+            <div class="form-item full" style="border: 2px solid var(--p2-color); padding: 8px; border-radius: 6px; background: #fff7e6;">
+                <label class="form-label" style="color:var(--p2-color); font-weight:800; font-size:14px;">⚡ L-Level (精力权重)</label>
+                <!-- Removed disabled logic entirely here, JS will also ensure it stays open -->
+                <select class="form-input" id="f_lLevel" onchange="handleLLevelChange()" style="font-weight:bold;">
+                    <option value="P1">P1 - 最高优先级 (Fire Fighting)</option>
+                    <option value="P2">P2 - 重点关注 (High)</option>
+                    <option value="P3" selected>P3 - 正常交付 (Normal)</option>
+                    <option value="P4">P4 - 挂起 (Suspended)</option>
+                    <option value="P5">P5 - 终止 (Terminated)</option>
+                </select>
+                <div style="font-size:11px; color:#d48806; margin-top:4px;">* 选择 P4/P5 将自动更新项目状态。您可以随时修改此项。</div>
+            </div>
+    
+            <div style="display:none;">
+                <input id="f_strategicValue" value="5">
+                <input id="f_implementationRisk" value="5">
+            </div>
+    
+            <div class="form-item"><label class="form-label">开始时间</label><input type="date" class="form-input" id="f_startDate"></div>
+            <div class="form-item"><label class="form-label">结束时间</label><input type="date" class="form-input" id="f_endDate"></div>
+            <div class="form-item"><label class="form-label">项目状态</label>
+                <select class="form-input" id="f_status" onchange="handleStatusChange()">
+                    <option value="交付中">交付中</option>
+                    <option value="交付&运维">交付&运维</option>
+                    <option value="运维中">运维中</option>
+                    <option disabled>──────────</option>
+                    <option value="已完结">已完结</option>
+                    <option value="挂起">挂起</option>
+                    <option value="终止">终止</option>
+                </select>
+            </div>
+            <div class="form-item"><label class="form-label">挂起/终止审批</label>
+                <select class="form-input" id="f_approval" onchange="autoCalc()">
+                    <option value="未通过/无">未通过/无</option><option value="已通过">已通过</option>
+                </select>
+            </div>
+            <div class="form-item"><label class="form-label">内因延期 (次) [-35分]</label><input type="number" min="0" class="form-input" id="f_delayInternal" value="0" oninput="autoCalc()"></div>
+            <div class="form-item"><label class="form-label">外因延期 (次) [-5分]</label><input type="number" min="0" class="form-input" id="f_delayExternal" value="0" oninput="autoCalc()"></div>
+            <div class="form-item full"><label class="form-label" style="color:var(--danger); font-weight:800;">🚨 安全责任事故 (一票否决)</label>
+                <select class="form-input" id="f_safety" onchange="autoCalc()" style="border:1px solid var(--danger); background:#fff1f0; color:#cf1322; font-weight:bold;">
+                    <option value="否">否 (正常)</option><option value="是">是 (本项0分，直接评级D)</option>
+                </select>
+            </div>
+            <div class="form-item full"><label class="form-label">备注</label><input class="form-input" id="f_note" placeholder="备注..."></div>
+            <div class="form-item"><label class="form-label" style="color:var(--primary)">★ 预览得分</label><input class="form-input" id="f_score" readonly style="background:var(--primary-light); color:var(--primary); font-weight:900;"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-top:20px;">
+            <!-- New Moved Delete Button -->
+            <button class="btn btn-danger" id="btnModalDelete" onclick="delProjectFromModal()" style="display:none;">🗑️ 删除当前项目</button>
+            <div style="flex:1; text-align:right;">
+                <button class="btn btn-outline" onclick="closeProjectModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveData()">💾 保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Data Mgmt Modal -->
+<div class="modal-mask" id="mgmtOverlay">
+    <div class="modal mgmt-modal" id="mgmtBox">
+        <div class="mgmt-header">
+            <div style="font-size:16px; font-weight:800; color:#2c3e50;"><i class="fas fa-cogs"></i> 数据管理控制台</div>
+            <button class="btn btn-outline" style="border:none; font-size:18px;" onclick="closeMgmtModal()">×</button>
+        </div>
+        <div class="mgmt-body">
+            <div class="mgmt-sidebar">
+                <div class="mgmt-nav-item active" onclick="switchMgmtTab('json')">📦 JSON 备份/恢复</div>
+                <div class="mgmt-nav-item" onclick="switchMgmtTab('excel')">📊 Excel 报表管理</div>
+                <div class="mgmt-nav-item danger-zone" onclick="switchMgmtTab('system')">🔥 系统维护 (高危)</div>
+            </div>
+            <div class="mgmt-content active" id="tab-json">
+                <div class="mgmt-card-grid">
+                    <div class="mgmt-card">
+                        <span class="mgmt-icon">📥</span>
+                        <div class="mgmt-h4">数据备份 (Backup)</div>
+                        <button class="btn btn-outline" onclick="exportJSON()">下载备份</button>
+                    </div>
+                    <div class="mgmt-card">
+                        <span class="mgmt-icon">📤</span>
+                        <div class="mgmt-h4">数据恢复 (Restore)</div>
+                        <button class="btn btn-primary" onclick="document.getElementById('importFileJSON').click()">选择文件恢复</button>
+                    </div>
+                </div>
+            </div>
+            <div class="mgmt-content" id="tab-excel">
+                <div class="mgmt-card-grid">
+                    <div class="mgmt-card">
+                        <span class="mgmt-icon" style="color:#27ae60">📊</span>
+                        <div class="mgmt-h4">导出 Excel</div>
+                        <button class="btn btn-outline" onclick="exportExcel()">导出 .xlsx</button>
+                    </div>
+                    <div class="mgmt-card">
+                        <span class="mgmt-icon" style="color:#27ae60">📂</span>
+                        <div class="mgmt-h4">导入 Excel</div>
+                        <button class="btn btn-primary" onclick="document.getElementById('importFileExcel').click()">导入 .xlsx</button>
+                    </div>
+                </div>
+            </div>
+            <div class="mgmt-content" id="tab-system">
+                <div style="padding:10px; border:1px solid #ffccc7; background:#fff1f0; border-radius:6px; margin-bottom:20px;">
+                    <strong style="color:#cf1322">⚠️ 高危操作区</strong><br>
+                    <span style="font-size:12px; color:#cf1322">以下操作不可逆，请谨慎执行。（默认密码：123456789）</span>
+                </div>
+                <div class="mgmt-card-grid">
+                    <div class="mgmt-card" style="border-color:#ffccc7">
+                        <div class="mgmt-h4 text-danger">清空重置</div>
+                        <button class="btn btn-danger" onclick="resetData('empty')">执行清空</button>
+                    </div>
+                    <div class="mgmt-card" style="border-color:#ffe58f">
+                        <div class="mgmt-h4">重置为演示数据</div>
+                        <button class="btn btn-outline" onclick="resetData('demo')">加载 Demo</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const COLORS = {
+        primary: '#13c2c2',  
+        success: '#52c41a', 
+        warning: '#faad14', 
+        danger: '#ff4d4f',  
+        secondary: '#722ed1',
+        // L-Levels
+        p1: '#f5222d',
+        p2: '#fa8c16',
+        p3: '#1890ff',
+        p4: '#bfbfbf',
+        p5: '#595959'
+    };
+
+    const DB_NAME = 'PM_Dashboard_v20_2';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'projects';
+    
+    // --- HELPERS ---
+    const idbHelper = {
+        db: null,
+        init: function() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onupgradeneeded = e => {
+                    const db = e.target.result;
+                    if(!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                };
+                request.onsuccess = e => { this.db = e.target.result; resolve(this.db); };
+                request.onerror = e => reject(e);
+            });
+        },
+        saveAll: function(data) {
+            return new Promise((resolve, reject) => {
+                if(!this.db) return resolve();
+                const tx = this.db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                store.clear().onsuccess = () => { data.forEach(item => store.add(item)); };
+                tx.oncomplete = () => resolve();
+            });
+        },
+        getAll: function() {
+            return new Promise((resolve, reject) => {
+                if(!this.db) return resolve([]);
+                const tx = this.db.transaction(STORE_NAME, 'readonly');
+                tx.objectStore(STORE_NAME).getAll().onsuccess = e => resolve(e.target.result);
+                tx.onerror = e => resolve([]);
+            });
+        }
+    };
+    
+    // --- STATE & HISTORY ---
+    function escapeHtml(text) {
+        if (text === null || text === undefined) return '';
+        return String(text).replace(/[&<>"']/g, function(m) { 
+            return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'}[m]; 
+        });
+    }
+    
+    const MAX_HISTORY = 20; 
+    let historyStack = [];
+    
+    function pushHistory() {
+        const snapshot = JSON.parse(JSON.stringify(projects));
+        historyStack.push(snapshot);
+        if (historyStack.length > MAX_HISTORY) historyStack.shift(); 
+        updateUndoButton(); 
+    }
+    
+    function undoLastAction() {
+        if (historyStack.length === 0) return;
+        if (confirm("确定要撤销上一步操作吗？")) {
+            const previousState = historyStack.pop();
+            projects = previousState;
+            persistData(true); 
+            alert("已撤销！");
+        }
+        updateUndoButton();
+    }
+    
+    function updateUndoButton() {
+        const btn = document.getElementById('btnUndo');
+        if(btn) {
+            btn.disabled = historyStack.length === 0;
+            btn.innerHTML = `↩ 撤销 (${historyStack.length})`;
+            btn.style.opacity = historyStack.length === 0 ? 0.5 : 1;
+        }
+    }
+    
+    let projects = [];
+    let displayProjects = []; 
+    // UPDATED FILTER STATE: Now arrays for multi-select
+    let filters = { manager: [], status: [], safety: [], lLevel: [] }; 
+    let activeChartFilter = null;
+    let sortState = { key: null, order: 'asc' };
+    var chartInstances = {}; 
+    let debounceTimer = null;
+    
+    function generateUUID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+    
+    // --- NEW: 16-Digit Code Generator ---
+    // Format: 1 Upper + 8 Digits + 1 Upper + 6 Digits (e.g., A20278534N019567)
+    function generateNewCode() {
+        const char = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        const randomChar = () => char[Math.floor(Math.random() * char.length)];
+        const randomNum = (len) => Math.floor(Math.random() * Math.pow(10, len)).toString().padStart(len, '0');
+        
+        return randomChar() + randomNum(8) + randomChar() + randomNum(6);
+    }
+    
+    function calcScore(p) {
+        if ((p.status === '挂起' || p.status === '终止') && p.approval === '已通过') return null;
+        if (p.safety) return 0;
+        return 100 - ((p.delayInternal||0)*35) - ((p.delayExternal||0)*5);
+    }
+    
+    let timeFilter = { mode: 'currentQ', start: null, end: null };
+    
+    function initTimeFilters() { applyTimePreset(); }
+    
+    function applyTimePreset() {
+        const mode = document.getElementById('timePreset').value;
+        const now = new Date();
+        const year = now.getFullYear();
+        let start, end;
+    
+        switch(mode) {
+            case 'currentQ':
+                const q = Math.floor((now.getMonth() + 3) / 3);
+                start = new Date(year, (q - 1) * 3, 1);
+                end = new Date(year, q * 3, 0); 
+                break;
+            case 'currentM':
+                start = new Date(year, now.getMonth(), 1);
+                end = new Date(year, now.getMonth() + 1, 0);
+                break;
+            case 'currentY':
+                start = new Date(year, 0, 1);
+                end = new Date(year, 12, 0);
+                break;
+            case 'q1': start = new Date(year, 0, 1); end = new Date(year, 3, 0); break;
+            case 'q2': start = new Date(year, 3, 1); end = new Date(year, 6, 0); break;
+            case 'q3': start = new Date(year, 6, 1); end = new Date(year, 9, 0); break;
+            case 'q4': start = new Date(year, 9, 1); end = new Date(year, 12, 0); break;
+            case 'all': start = null; end = null; break;
+            case 'custom': document.getElementById('filterStartDate').focus(); return; 
+        }
+    
+        if (mode !== 'custom') {
+            timeFilter.mode = mode;
+            if (start && end) {
+                timeFilter.start = fmtDate(start);
+                timeFilter.end = fmtDate(end);
+                document.getElementById('filterStartDate').value = timeFilter.start;
+                document.getElementById('filterEndDate').value = timeFilter.end;
+            } else {
+                timeFilter.start = null; timeFilter.end = null;
+                document.getElementById('filterStartDate').value = '';
+                document.getElementById('filterEndDate').value = '';
+            }
+            refreshUI();
+        }
+    }
+    
+    function handleCustomDate() {
+        document.getElementById('timePreset').value = 'custom';
+        timeFilter.mode = 'custom';
+        timeFilter.start = document.getElementById('filterStartDate').value;
+        timeFilter.end = document.getElementById('filterEndDate').value;
+        refreshUI();
+    }
+    
+    function fmtDate(d) { return d.toISOString().split('T')[0]; }
+    
+    function isProjectInTimeRange(p) {
+        if (!timeFilter.start || !timeFilter.end) return true;
+        const pStart = p.startDate;
+        const pEnd = p.endDate || '2099-12-31';
+        return pStart <= timeFilter.end && pEnd >= timeFilter.start;
+    }
+    
+    // --- UPDATED: applyBusinessRules with Alert Summary ---
+    function applyBusinessRules() {
+        const now = new Date();
+        const longSuspended = [];
+        
+        projects.forEach(p => {
+            if (p.status === '挂起' && p.endDate) {
+                const end = new Date(p.endDate);
+                // Calculate difference in days between NOW and END DATE
+                const diffDays = (now - end) / (1000 * 60 * 60 * 24);
+                
+                if (diffDays > 60) {
+                    longSuspended.push(p.name);
+                }
+            }
+        });
+        
+        // Show summary alert if any found
+        if (longSuspended.length > 0) {
+            // Wait a bit for UI to render
+            setTimeout(() => {
+                alert(`⚠️ 治理预警 (Governance Alert)\n\n检测到 ${longSuspended.length} 个项目处于“挂起”状态且已超期 >60 天。\n\n根据管理规定，这些项目必须转为 [终止] 或 [已完结]。\n\n涉及项目示例：\n${longSuspended.slice(0, 5).join('\n')}\n${longSuspended.length > 5 ? '...' : ''}`);
+            }, 500);
+        }
+    }
+    
+    function getStats(filteredList) {
+        const visibleManagers = [...new Set(filteredList.map(p => p.manager))];
+        return visibleManagers.map(mgrName => {
+            const mgrProjects = projects.filter(p => p.manager === mgrName && isProjectInTimeRange(p));
+    
+            const s = { 
+                name: mgrName, 
+                total: 0, validCnt: 0, sumScore: 0, safetyFail: false, 
+                finished: 0, goodCnt: 0, noDelayCnt: 0, sumInt: 0, sumExt: 0, negCount: 0,
+                p1Cnt: 0, p2Cnt: 0, p3Cnt: 0, p4Cnt: 0, p5Cnt: 0,
+                activeTotal: 0, suspendCnt: 0, termCnt: 0, customTotal: 0,
+                safetyScoreTotal: 0, scheduleScoreTotal: 0, accidentCount: 0
+            };
+    
+            mgrProjects.forEach(p => {
+                s.total++;
+                const lvl = p.lLevel || 'P3';
+                if (lvl === 'P1') s.p1Cnt++; else if (lvl === 'P2') s.p2Cnt++; else if (lvl === 'P3') s.p3Cnt++; else if (lvl === 'P4') s.p4Cnt++; else if (lvl === 'P5') s.p5Cnt++;
+                
+                if (p.status === '挂起') s.suspendCnt++;
+                if (p.status === '终止') s.termCnt++;
+                if (p.status === '已完结') s.finished++;
+    
+                if (p.safety) { s.safetyFail = true; s.accidentCount++; }
+                s.sumInt += (p.delayInternal||0); s.sumExt += (p.delayExternal||0);
+                if ((p.delayInternal || 0) + (p.delayExternal || 0) === 0) s.noDelayCnt++;
+    
+                const score = calcScore(p);
+                if (score !== null) {
+                    s.validCnt++; s.sumScore += score;
+                    if (score >= 90) s.goodCnt++;
+                    if (score < 0) s.negCount++;
+                    s.safetyScoreTotal += (p.safety ? 0 : 100);
+                    s.scheduleScoreTotal += (100 - ((p.delayInternal||0)*35) - ((p.delayExternal||0)*5));
+                }
+            });
+            
+            s.activeTotal = s.p1Cnt + s.p2Cnt + s.p3Cnt;
+            s.customTotal = s.activeTotal + s.p4Cnt; 
+            
+            const avgSafety = s.validCnt > 0 ? (s.safetyScoreTotal / s.validCnt) : 0;
+            const avgSchedule = s.validCnt > 0 ? (s.scheduleScoreTotal / s.validCnt) : 0;
+            s.avgSafetyScore = s.validCnt > 0 ? avgSafety.toFixed(1) : '-';
+            s.avgScheduleScore = s.validCnt > 0 ? avgSchedule.toFixed(1) : '-';
+            
+            let weightedScore = (avgSafety * 0.6) + (avgSchedule * 0.4);
+            s.avgScore = s.validCnt > 0 ? weightedScore.toFixed(1) : 0;
+            s.grade = s.avgScore >= 90 ? 'S' : (s.avgScore >= 75 ? 'A' : (s.avgScore >= 60 ? 'C' : 'D'));
+            
+            return s;
+        });
+    }
+    
+    function handleLLevelChange() {
+        const lvl = document.getElementById('f_lLevel').value;
+        const statusEl = document.getElementById('f_status');
+        
+        if (lvl === 'P4') { statusEl.value = '挂起'; } 
+        else if (lvl === 'P5') { statusEl.value = '终止'; } 
+        else {
+            if (['挂起', '终止', '已完结'].includes(statusEl.value)) { statusEl.value = '交付中'; }
+        }
+        autoCalc();
+    }
+    
+    function handleStatusChange() {
+        const status = document.getElementById('f_status').value;
+        const lLevelEl = document.getElementById('f_lLevel');
+        
+        // BUG FIX: Always keep L-Level enabled for editing
+        lLevelEl.disabled = false;
+        lLevelEl.style.opacity = '1';
+        
+        if (status === '挂起') lLevelEl.value = 'P4';
+        else if (status === '终止') lLevelEl.value = 'P5';
+        else if (['交付中', '交付&运维', '运维中'].includes(status) && (lLevelEl.value === 'P4' || lLevelEl.value === 'P5')) {
+            lLevelEl.value = 'P3'; 
+        }
+        
+        autoCalc();
+    }
+    
+    function toggleAdvanced() {
+        const zone = document.getElementById('advancedZone');
+        const btn = document.getElementById('collapseBtn');
+        const isHidden = (zone.style.display === 'none' || zone.style.display === '');
+        zone.style.display = isHidden ? 'block' : 'none';
+        btn.innerHTML = isHidden ? '<i>▲</i> 点击展开 / 收起：L-Level 精力分布 · 树图 · 桑基 · 甘特' : '<i>▼</i> 点击展开 / 收起：L-Level 精力分布 · 树图 · 桑基 · 甘特';
+        if (isHidden) { 
+            renderCharts(displayProjects); 
+            setTimeout(() => {
+                 const ids = ['chartEnergy', 'chartTreeMap', 'chartSankey', 'chartGantt'];
+                 ids.forEach(id => { if(chartInstances[id]) chartInstances[id].resize(); });
+            }, 50);
+        }
+    }
+    
+    function closeAllPopups(e) {
+        if (!e.target.closest('.filter-menu') && !e.target.closest('.filter-btn')) {
+            document.getElementById('filterMenu').style.display = 'none';
+        }
+    }
+    
+    function openProjectModal() {
+        document.getElementById('editIndex').value = '-1';
+        ['f_manager','f_name','f_startDate','f_endDate','f_note'].forEach(id=>document.getElementById(id).value='');
+        
+        // Auto-generate new code
+        document.getElementById('f_code').value = generateNewCode();
+        
+        document.getElementById('f_status').value = '交付中';
+        document.getElementById('f_approval').value = '未通过/无';
+        document.getElementById('f_lLevel').value = 'P3';
+        document.getElementById('f_delayInternal').value = 0;
+        document.getElementById('f_delayExternal').value = 0;
+        document.getElementById('f_safety').value = '否';
+        
+        // Hide delete button for new projects
+        document.getElementById('btnModalDelete').style.display = 'none';
+        
+        handleStatusChange();
+        autoCalc();
+        document.getElementById('modalOverlay').style.display = 'block';
+    }
+    
+    function closeProjectModal() { document.getElementById('modalOverlay').style.display = 'none'; }
+    
+    function editProject(idx) {
+        const p = projects[idx];
+        document.getElementById('editIndex').value = idx;
+        document.getElementById('f_manager').value = p.manager;
+        document.getElementById('f_code').value = p.code;
+        document.getElementById('f_name').value = p.name;
+        document.getElementById('f_startDate').value = p.startDate;
+        document.getElementById('f_endDate').value = p.endDate;
+        document.getElementById('f_status').value = p.status;
+        document.getElementById('f_approval').value = p.approval;
+        document.getElementById('f_lLevel').value = p.lLevel || 'P3';
+        document.getElementById('f_delayInternal').value = p.delayInternal;
+        document.getElementById('f_delayExternal').value = p.delayExternal;
+        document.getElementById('f_safety').value = p.safety ? '是' : '否';
+        document.getElementById('f_note').value = p.note;
+        
+        // Show delete button for existing projects
+        document.getElementById('btnModalDelete').style.display = 'inline-block';
+        
+        handleStatusChange();
+        autoCalc();
+        document.getElementById('modalOverlay').style.display = 'block';
+    }
+    
+    // --- NEW: Delete Logic ---
+    function delProjectFromModal() {
+        const idx = parseInt(document.getElementById('editIndex').value);
+        if(idx === -1) return;
+        
+        if(confirm('确定删除该项目吗？此操作不可逆。')) {
+            pushHistory();
+            projects.splice(idx, 1);
+            persistData();
+            closeProjectModal();
+        }
+    }
+    
+    function batchDelete() {
+        // Get all checked boxes
+        const checkboxes = document.querySelectorAll('.row-checkbox:checked');
+        if (checkboxes.length === 0) {
+            alert("请至少勾选一个项目！");
+            return;
+        }
+        
+        // Password Prompt
+        const pwd = prompt(`⚠️ 批量删除警告 \n\n您即将删除 ${checkboxes.length} 个项目。\n请输入管理密码确认：`, "");
+        if (pwd !== "123456789") {
+            alert("密码错误！操作已取消。");
+            return;
+        }
+        
+        // Execution
+        pushHistory();
+        const indicesToDelete = Array.from(checkboxes).map(cb => parseInt(cb.value)).sort((a,b) => b-a); // Sort desc
+        
+        // Convert display indices to real project IDs or filter
+        // Issue: displayProjects indices might differ from projects if filtered.
+        // Solution: Use _uid for safe deletion
+        const uidsToDelete = new Set();
+        checkboxes.forEach(cb => {
+            uidsToDelete.add(cb.dataset.uid);
+        });
+        
+        const initialCount = projects.length;
+        projects = projects.filter(p => !uidsToDelete.has(p._uid));
+        const deletedCount = initialCount - projects.length;
+        
+        persistData();
+        alert(`成功删除 ${deletedCount} 个项目。`);
+    }
+    
+    function toggleSelectAll(source) {
+        const checkboxes = document.querySelectorAll('.row-checkbox');
+        checkboxes.forEach(cb => cb.checked = source.checked);
+    }
+    
+    function saveData() {
+        const idx = parseInt(document.getElementById('editIndex').value);
+        const data = {
+            manager: document.getElementById('f_manager').value,
+            code: document.getElementById('f_code').value,
+            name: document.getElementById('f_name').value,
+            startDate: document.getElementById('f_startDate').value,
+            endDate: document.getElementById('f_endDate').value,
+            status: document.getElementById('f_status').value,
+            approval: document.getElementById('f_approval').value,
+            lLevel: document.getElementById('f_lLevel').value,
+            delayInternal: parseInt(document.getElementById('f_delayInternal').value)||0,
+            delayExternal: parseInt(document.getElementById('f_delayExternal').value)||0,
+            safety: document.getElementById('f_safety').value === '是',
+            note: document.getElementById('f_note').value
+        };
+        
+        if(!data.manager || !data.code || !data.name) { alert('请填写必填项(*)'); return; }
+    
+        // --- NEW VALIDATION: Time-boxed Status (Zombie Project Check) ---
+        // Rule 1: Zombie (> 365 days overdue)
+        if (data.endDate) {
+            const end = new Date(data.endDate);
+            const now = new Date();
+            const daysOverdue = (now - end) / (1000 * 60 * 60 * 24);
+            
+            if (daysOverdue > 365) {
+                if (!['已完结', '终止'].includes(data.status)) {
+                    if(!confirm(`⚠️ 业务规则警告 (Business Rule Alert)\n\n该项目计划结束于 ${data.endDate}，已超期 >1 年。\n\n根据管理规定：长期未完结项目应转为 [已完结] 或 [终止]。\n\n确定要强制保存为当前状态吗？`)) {
+                        return; // Block save if user cancels
+                    }
+                }
+            }
+        }
+        
+        // Rule 2: Suspended Limit (> 60 days overdue AND Status is Suspended)
+        if (data.status === '挂起' && data.endDate) {
+             const end = new Date(data.endDate);
+             const now = new Date();
+             const diffDays = (now - end) / (1000 * 60 * 60 * 24);
+             if (diffDays > 60) {
+                 if(!confirm(`⚠️ 挂起超时警告\n\n该项目已挂起超过 60 天（基于结束时间）。\n\n建议操作：\n请将状态修改为 [终止] 或 [已完结]。\n\n是否强制保持“挂起”状态？`)) {
+                     return;
+                 }
+             }
+        }
+        
+        pushHistory(); 
+        
+        if (idx === -1) {
+            data._uid = generateUUID();
+            if(projects.some(p => p.code === data.code)) { 
+                alert('商机编号已存在！'); historyStack.pop(); updateUndoButton(); return; 
+            }
+            projects.unshift(data);
+        } else {
+            data._uid = projects[idx]._uid;
+            if(projects.some((p, i) => p.code === data.code && i !== idx)) { 
+                alert('商机编号已存在！'); historyStack.pop(); updateUndoButton(); return; 
+            }
+            projects[idx] = data;
+        }
+        persistData();
+        closeProjectModal();
+    }
+    
+    function autoCalc() {
+        const p = {
+            status: document.getElementById('f_status').value,
+            approval: document.getElementById('f_approval').value,
+            delayInternal: parseInt(document.getElementById('f_delayInternal').value)||0,
+            delayExternal: parseInt(document.getElementById('f_delayExternal').value)||0,
+            safety: document.getElementById('f_safety').value === '是'
+        };
+        const s = calcScore(p);
+        const el = document.getElementById('f_score');
+        el.value = (s === null) ? '不计分' : s;
+    }
+    
+    function handleSort(key) {
+        if (sortState.key === key) sortState.order = sortState.order === 'asc' ? 'desc' : 'asc';
+        else { sortState.key = key; sortState.order = 'asc'; }
+        updateSortIcons();
+        refreshUI();
+    }
+    
+    function updateSortIcons() {
+        document.querySelectorAll('.sort-icon').forEach(el => {
+            el.className = 'sort-icon';
+            if (el.id === 'sort_' + sortState.key) el.classList.add(sortState.order === 'asc' ? 'sort-asc' : 'sort-desc');
+        });
+    }
+    
+    // --- UPDATED: Excel-Like Filtering Logic ---
+    
+    function toggleFilter(e, key) {
+        e.stopPropagation();
+        const menu = document.getElementById('filterMenu');
+        
+        // 1. Collect unique values for this column
+        const uniqueValues = [...new Set(projects.map(p => {
+             if(key==='safety') return p.safety ? '是' : '否';
+             // Updated logic to handle visual checkmark
+             if(key==='lLevel' && p.status==='已完结') return '✅ (已完结)';
+             return p[key] || (key === 'lLevel' ? 'P3' : '-'); 
+        }))].sort();
+        
+        // 2. Build Checkbox List HTML
+        let html = `
+            <label style="font-weight:bold; border-bottom:1px solid #eee; margin-bottom:4px; padding-bottom:4px;">
+                <input type="checkbox" id="filter_select_all_${key}" onchange="toggleFilterSelectAll(this, '${key}')"> (全选)
+            </label>
+            <div style="max-height:180px; overflow-y:auto;">
+        `;
+        
+        uniqueValues.forEach(v => {
+            // Check if this value is currently selected (or if no filter is applied, assume selected for UI logic, though data logic differs)
+            // But here we rely on the `filters[key]` array. Empty array means "All selected" conceptually, but visually we might want to check all.
+            // Let's adopt logic: Empty array = All Checked in UI. 
+            const isChecked = filters[key].length === 0 || filters[key].includes(v);
+            html += `<label><input type="checkbox" class="filter-option-${key}" value="${v}" ${isChecked ? 'checked' : ''}> ${escapeHtml(v)}</label>`;
+        });
+        
+        html += `</div>
+            <div class="filter-actions">
+                <button onclick="document.getElementById('filterMenu').style.display='none'">取消</button>
+                <button class="confirm" onclick="confirmFilter('${key}')">确定</button>
+            </div>
+        `;
+        
+        menu.innerHTML = html;
+        menu.style.left = Math.min(e.pageX, window.innerWidth - 180) + 'px'; // Prevent overflow right
+        menu.style.top = e.pageY + 'px';
+        menu.style.display = 'block';
+        
+        // Set "Select All" state initially
+        const allCheckboxes = document.querySelectorAll(`.filter-option-${key}`);
+        const checkedCount = Array.from(allCheckboxes).filter(cb => cb.checked).length;
+        document.getElementById(`filter_select_all_${key}`).checked = (checkedCount === allCheckboxes.length);
+    }
+    
+    function toggleFilterSelectAll(source, key) {
+        const checkboxes = document.querySelectorAll(`.filter-option-${key}`);
+        checkboxes.forEach(cb => cb.checked = source.checked);
+    }
+    
+    function confirmFilter(key) {
+        const checkboxes = document.querySelectorAll(`.filter-option-${key}:checked`);
+        const allCheckboxes = document.querySelectorAll(`.filter-option-${key}`);
+        
+        // If all are checked, we treat it as "No Filter" (empty array)
+        if (checkboxes.length === allCheckboxes.length) {
+            filters[key] = [];
+        } else {
+            filters[key] = Array.from(checkboxes).map(cb => cb.value);
+        }
+        
+        document.getElementById('filterMenu').style.display = 'none';
+        
+        // Update Filter Icon State
+        const btn = document.getElementById('filter_icon_' + key);
+        if(filters[key].length > 0) btn.classList.add('filter-active'); 
+        else btn.classList.remove('filter-active');
+        
+        refreshUI();
+    }
+    
+    function getLLevelBadge(p) {
+        if (p.status === '已完结') return `<span class="l-badge" style="background:transparent; border:none; box-shadow:none; font-size:16px;">✅</span>`;
+        if (p.status === '终止') return '<span class="l-badge l-p5">P5</span>';
+        if (p.status === '挂起') return '<span class="l-badge l-p4">P4</span>';
+        const lvl = p.lLevel || 'P3';
+        const cls = { 'P1': 'l-p1', 'P2': 'l-p2', 'P3': 'l-p3' };
+        return `<span class="l-badge ${cls[lvl] || 'l-p3'}">${lvl}</span>`;
+    }
+    
+    function copyToClipboard(text) {
+        try {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed"; textArea.style.left = "-9999px";
+            document.body.appendChild(textArea);
+            textArea.focus(); textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            alert('已复制: ' + text);
+        } catch (err) { prompt("复制失败，请手动复制:", text); }
+    }
+    
+    async function initApp() {
+        try { 
+            await idbHelper.init(); 
+            const dbData = await idbHelper.getAll(); 
+            if (dbData && dbData.length > 0) projects = dbData; 
+            else loadFallbackOrDemo(); 
+        } 
+        catch (e) { console.error(e); loadFallbackOrDemo(); }
+        
+        applyBusinessRules(); 
+        initTimeFilters(); 
+        refreshUI();
+        updateUndoButton(); 
+    }
+    
+    function loadFallbackOrDemo() {
+        const local = localStorage.getItem('pm_data_backup_v19_5'); 
+        if(local) {
+             projects = JSON.parse(local).map(p => ({...p, lLevel: p.lLevel || 'P3'}));
+        } else generateDemoData();
+    }
+    
+    function generateDemoData() {
+        let data = [];
+        const now = new Date();
+        const fmt = d => d.toISOString().split('T')[0];
+        
+        const managers = ['张三', '李四', '王五', '赵六', '钱七', '孙八', '周九', '吴十'];
+        const projPrefixes = ['AI中台', '分布式DB', '私有云PaaS', '全链路监控', 'API网关', 'OA信创', 'HRM系统', '财务自动化', '官网重构', 'CRM画像', '知识库', '供应链金融', 'IoT边缘', '支付网关', '风控引擎', '数字孪生', '交易核心', '堡垒机', 'WMS库存', 'TMS运输', 'MES生产', 'MDM主数据'];
+        const phases = ['一期建设', '二期迭代', '性能优化', '系统重构', '上云迁移', '国产化替代', 'POC验证'];
+        const activeStatuses = ['交付中', '交付&运维', '运维中'];
+        const rand = (arr) => arr[Math.floor(Math.random() * arr.length)];
+        const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+    
+        for (let i = 0; i < 50; i++) {
+            const statusRoll = Math.random();
+            let status = rand(activeStatuses);
+            let lLevel = 'P3';
+            let approval = '未通过/无';
+            
+            if (statusRoll < 0.3) status = '已完结';
+            else if (statusRoll < 0.4) { status = '挂起'; lLevel = 'P4'; }
+            else if (statusRoll < 0.45) { status = '终止'; lLevel = 'P5'; approval = '已通过'; }
+            
+            if (activeStatuses.includes(status)) {
+                const lRoll = Math.random();
+                if (lRoll < 0.15) lLevel = 'P1'; else if (lRoll < 0.4) lLevel = 'P2';
+            }
+    
+            const duration = randInt(30, 200);
+            let startDateObj = new Date(now);
+            startDateObj.setDate(startDateObj.getDate() + randInt(-150, 20));
+            let endDateObj = new Date(startDateObj);
+            endDateObj.setDate(endDateObj.getDate() + duration);
+    
+            const safety = Math.random() < 0.02;
+            let delayInt = 0, delayExt = 0;
+            if (!safety && status !== '挂起' && status !== '终止') {
+                if (Math.random() < 0.3) delayInt = randInt(1, 3);
+                if (Math.random() < 0.3) delayExt = randInt(1, 4);
+            }
+    
+            data.push({
+                _uid: generateUUID(),
+                manager: rand(managers),
+                code: generateNewCode(), // Updated Logic
+                name: rand(projPrefixes) + ' - ' + rand(phases),
+                startDate: fmt(startDateObj),
+                endDate: fmt(endDateObj),
+                status: status,
+                approval: approval,
+                delayInternal: delayInt,
+                delayExternal: delayExt,
+                safety: safety,
+                note: safety ? '【重大事故】' : '',
+                lLevel: lLevel
+            });
+        }
+        projects = data;
+        persistData();
+    }
+    
+    function handleSearchInput(el) {
+        document.getElementById('searchClear').style.display = el.value.length > 0 ? 'block' : 'none';
+        handleSearchDebounced();
+    }
+    
+    function clearSearch() {
+        document.getElementById('searchInput').value = '';
+        document.getElementById('searchClear').style.display = 'none';
+        refreshUI();
+    }
+    
+    function handleSearchDebounced() { clearTimeout(debounceTimer); debounceTimer = setTimeout(refreshUI, 200); }
+    
+    function setChartFilter(type, value) {
+        activeChartFilter = { type, value };
+        document.getElementById('activeFilterBar').style.display = 'flex';
+        document.getElementById('filterLabel').innerText = `${type==='manager'?'交付经理':type}: ${value}`;
+        refreshUI();
+        document.getElementById('detailTable').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    
+    function clearChartFilter() {
+        activeChartFilter = null;
+        document.getElementById('activeFilterBar').style.display = 'none';
+        refreshUI();
+    }
+    
+    document.addEventListener('keydown', function(event) {
+        if (event.key === "Escape" && activeChartFilter) { clearChartFilter(); }
+    });
+    
+    function refreshUI() {
+        const keyword = document.getElementById('searchInput').value.toUpperCase();
+        
+        displayProjects = projects.filter(p => {
+            const matchText = (String(p.manager) + ' ' + String(p.name) + ' ' + String(p.code)).toUpperCase().includes(keyword);
+            if (!matchText) return false;
+            
+            // --- UPDATED MULTI-FILTER LOGIC ---
+            // If the filter array has items, the property value MUST be in that array.
+            
+            if (filters.manager.length > 0 && !filters.manager.includes(p.manager)) return false;
+            
+            if (filters.status.length > 0 && !filters.status.includes(p.status)) return false;
+            
+            if (filters.lLevel.length > 0) {
+                let lvl = p.lLevel || 'P3';
+                // Map visual badge back to filter value
+                if (p.status === '已完结') lvl = '✅ (已完结)';
+                if (!filters.lLevel.includes(lvl)) return false;
+            }
+            
+            if (filters.safety.length > 0) {
+                const val = p.safety ? '是' : '否';
+                if (!filters.safety.includes(val)) return false;
+            }
+            
+            // ----------------------------------
+    
+            if (activeChartFilter) {
+                if (activeChartFilter.type === 'manager' && p.manager !== activeChartFilter.value) return false;
+                if (activeChartFilter.type === 'project' && p.name !== activeChartFilter.value) return false;
+                if (activeChartFilter.type === 'status' && p.status !== activeChartFilter.value) return false;
+            }
+            return true;
+        });
+    
+        if (sortState.key) {
+            const k = sortState.key;
+            const asc = sortState.order === 'asc' ? 1 : -1;
+            displayProjects.sort((a, b) => {
+                let va = a[k], vb = b[k];
+                if (k === 'score') {
+                    let sa = calcScore(a), sb = calcScore(b);
+                    if (sa === null) sa = -9999; if (sb === null) sb = -9999;
+                    return (sa - sb) * asc;
+                }
+                if (k === 'lLevel') return (va || 'P3').localeCompare(vb || 'P3') * asc;
+                if (typeof va === 'string') return va.localeCompare(vb) * asc;
+                return (va - vb) * asc;
+            });
+            updateSortIcons();
+        }
+        renderTable(displayProjects);
+        renderSummary(displayProjects);
+        renderCharts(displayProjects); 
+    }
+    
+    function getScoreConfig(score) {
+        if (score === null) return { text: '不计', class: 'color:#9ca3af; font-weight:bold;' };
+        if (score < 60) return { text: score, class: 'color:var(--danger); font-weight:900;' };
+        if (score < 75) return { text: score, class: 'color:var(--warning); font-weight:900;' };
+        if (score >= 90) return { text: score, class: 'color:var(--success); font-weight:900;' };
+        return { text: score, class: 'color:var(--primary); font-weight:900;' };
+    }
+    
+    function getStatusBadge(status) {
+        const map = { 
+            '已完结': 'tag-green', '交付中': 'tag-teal', '交付&运维': 'tag-geekblue', 
+            '运维中': 'tag-cyan', '挂起': 'tag-gray', '终止': 'tag-gray' 
+        };
+        return `<span class="tag ${map[status] || 'tag-gray'}">${status}</span>`;
+    }
+    
+    function isStaleProject(p) {
+        if (['交付中', '交付&运维', '运维中'].includes(p.status)) {
+             if (!p.startDate) return false;
+             const days = (new Date() - new Date(p.startDate)) / (1000 * 60 * 60 * 24);
+             return days > 365 && !p.safety;
+        }
+        return false;
+    }
+    
+    function renderTable(data) {
+        const tbody = document.getElementById('detailBody');
+        tbody.innerHTML = data.map((p, displayIndex) => {
+            const scoreConf = getScoreConfig(calcScore(p));
+            const safetyDisplay = p.safety ? '<span class="tag tag-red">事故</span>' : '-';
+            const realIndex = projects.indexOf(p);
+            const isStale = isStaleProject(p);
+            const rowClass = p.safety ? 'row-meltdown' : (isStale ? 'row-stale' : '');
+            
+            const safeManager = escapeHtml(p.manager);
+            const safeCode = escapeHtml(p.code);
+            const safeName = escapeHtml(p.name);
+            const safeNote = escapeHtml(p.note || '');
+    
+            let nameDisplay = safeName;
+            if (isStale) nameDisplay += `<span class="stale-badge" title="[周期警报] >1年">⚠ 滞留</span>`;
+            
+            // --- NEW: Visual Badge for Zombie Violation ---
+            if (p.endDate) {
+                const end = new Date(p.endDate);
+                const now = new Date();
+                const daysOver = (now - end) / (1000 * 3600 * 24);
+                if (daysOver > 365 && !['已完结', '终止'].includes(p.status)) {
+                    nameDisplay += ` <span class="tag" style="background:#2c3e50; color:#fff; border:1px solid #000; font-weight:bold; margin-left:4px;">💀 违规僵尸</span>`;
+                }
+            }
+            
+            // --- NEW: Visual Badge for Suspended Violation ---
+            if (p.status === '挂起' && p.endDate) {
+                const end = new Date(p.endDate);
+                const now = new Date();
+                const daysDiff = (now - end) / (1000 * 60 * 60 * 24);
+                if (daysDiff > 60) {
+                     nameDisplay += ` <span class="tag" style="background:#faad14; color:#fff; border:1px solid #d48806; font-weight:bold; margin-left:4px;">⚠️ 长期挂起转终止</span>`;
+                }
+            }
+            // ---------------------------------------------
+    
+            return `<tr class="${rowClass}">
+                <td class="check-col"><input type="checkbox" class="row-checkbox" value="${realIndex}" data-uid="${p._uid}"></td>
+                <td style="color:#bfbfbf; text-align:center;">${displayIndex + 1}</td>
+                <td><span class="tag tag-blue">${safeManager}</span></td>
+                
+                <!-- Modified Clickable Code Column -->
+                <td onclick="editProject(${realIndex})">
+                    <span class="tag tag-purple clickable-code" style="font-family:monospace; font-weight:bold; font-size:12px;">${safeCode}</span>
+                </td>
+                
+                <td><div style="font-weight:600; color:#333; font-size:14px;">${nameDisplay}</div></td>
+                <td style="font-size:13px; color:#666;">${p.startDate}</td>
+                <td style="font-size:13px; color:#666;">${p.endDate}</td>
+                <td>${getStatusBadge(p.status)}</td>
+                <td style="text-align:center;">${getLLevelBadge(p)}</td>
+                <td style="font-size:13px; color:${p.approval==='已通过'?'var(--success)':'#999'}">${p.approval}</td>
+                <td style="text-align:center; color:#666; font-weight:600;"><span style="color:var(--danger)">${p.delayInternal}</span> / <span style="color:var(--warning)">${p.delayExternal}</span></td>
+                <td style="text-align:center; font-size:14px; ${scoreConf.class}">${scoreConf.text}</td>
+                <td style="text-align:center">${safetyDisplay}</td>
+                <td style="font-size:12px; color:#666; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${safeNote}">${safeNote}</td>
+            </tr>`;
+        }).join('');
+    }
+    
+    function renderSummary(data) {
+        const stats = getStats(data);
+        const tbody = document.getElementById('summaryBody');
+        const panel = document.getElementById('teamStatsPanel');
+        
+        if(stats.length > 0) {
+            let validSafetyCnt = 0, totalSafety = 0;
+            let validScheduleCnt = 0, totalSchedule = 0;
+            stats.forEach(s => {
+                if(s.avgSafetyScore !== '-') { totalSafety += parseFloat(s.avgSafetyScore); validSafetyCnt++; }
+                if(s.avgScheduleScore !== '-') { totalSchedule += parseFloat(s.avgScheduleScore); validScheduleCnt++; }
+            });
+            const teamSafety = validSafetyCnt > 0 ? (totalSafety / validSafetyCnt).toFixed(1) : '-';
+            const teamSchedule = validScheduleCnt > 0 ? (totalSchedule / validScheduleCnt).toFixed(1) : '-';
+            let teamWeighted = 0, gradeHtml = '<span style="color:#999">-</span>';
+            if (teamSafety !== '-' && teamSchedule !== '-') {
+                teamWeighted = (parseFloat(teamSafety) * 0.6) + (parseFloat(teamSchedule) * 0.4);
+                const grade = teamWeighted >= 90 ? 'S' : (teamWeighted >= 75 ? 'A' : (teamWeighted >= 60 ? 'C' : 'D'));
+                const gradeClass = 'grade-text-' + grade.toLowerCase();
+                gradeHtml = `<span class="${gradeClass}">${grade}</span>`;
+            }
+            panel.innerHTML = `
+                <div class="team-stats-row">
+                    <div class="team-stat-bar">
+                        <div class="ts-label">🛡️ 团队风险分</div>
+                        <div class="ts-value" style="color:${teamSafety<100?'var(--danger)':'var(--success)'}">${teamSafety}</div>
+                    </div>
+                    <div class="team-stat-bar">
+                        <div class="ts-label">⏱️ 团队进度分</div>
+                        <div class="ts-value" style="color:${teamSchedule<60?'var(--danger)':'#333'}">${teamSchedule}</div>
+                    </div>
+                    <div class="team-stat-bar" style="background:#fffbe6; border-color:#ffe58f;">
+                        <div class="ts-label" style="color:#d48806">🏆 团队综合等级</div>
+                        <div class="ts-value">${gradeHtml} <span style="font-size:12px; font-weight:normal; color:#999;">(${teamWeighted.toFixed(1)})</span></div>
+                    </div>
+                </div>`;
+            panel.style.display = 'block';
+        } else { panel.style.display = 'none'; }
+    
+        if(stats.length === 0) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#999; padding:20px;">无匹配数据</td></tr>'; return; }
+        
+        tbody.innerHTML = stats.map(s => {
+            const rowClass = s.safetyFail ? 'row-meltdown' : '';
+            const safetyText = s.safetyFail 
+                ? `<span style="color:var(--danger);font-weight:bold;">🚨 发生${s.accidentCount}起</span>` 
+                : '<span style="color:var(--success);font-weight:bold;">🛡️ 安全达标</span>';
+            const p1Alert = s.p1Cnt >= 2 ? 'active' : 'normal';
+            const p4AlertClass = s.p4Cnt >= 5 ? 'inventory-alert' : '';
+            
+            return `<tr class="${rowClass}">
+                <td style="font-weight:700; cursor:pointer; color:var(--primary); text-decoration:underline; vertical-align:top; padding-top:12px;" onclick="setChartFilter('manager', '${s.name}')" title="点击筛选">${s.name}</td>
+                <td style="vertical-align:top; padding:8px;">
+                    <div class="summary-cell-split">
+                        <div style="display:flex; align-items:baseline; gap:6px; margin-bottom:4px;">
+                            <span style="font-size:16px; font-weight:800; color:#333;">${s.activeTotal}</span>
+                            <span style="font-size:11px; color:#999;">进行中 (P1-P3)</span>
+                        </div>
+                        <div class="p-stat-row">
+                            <span class="p-tag ${p1Alert}" title="救火项目">🔥P1:${s.p1Cnt}</span>
+                            <span class="p-tag normal" style="color:var(--p2-color)">P2:${s.p2Cnt}</span>
+                            <span class="p-tag normal" style="color:var(--p3-color)">P3:${s.p3Cnt}</span>
+                            <span class="${p4AlertClass}" style="color:#999; margin-left:2px; font-size:11px;">⏸P4:${s.p4Cnt}</span>
+                        </div>
+                    </div>
+                </td>
+                <td style="vertical-align:top; padding:8px;">
+                    <div class="result-cell">
+                        <div class="result-item" style="color:var(--success); font-weight:bold;"><span>✅ 完结:</span> <span>${s.finished}</span></div>
+                        <div class="result-item" style="color:#999;"><span>💀 终止:</span> <span>${s.p5Cnt}</span></div>
+                    </div>
+                </td>
+                <td style="vertical-align:top; padding:8px;">
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:12px;">
+                        <div style="display:flex; align-items:center; gap:4px;"><span style="color:#999; font-weight:bold; min-width:60px;">风险管控：</span>${safetyText}</div>
+                        <div style="display:flex; align-items:center; gap:4px;"><span style="color:#999; font-weight:bold; min-width:60px;">进度管控：</span><div style="font-size:11px; color:#666;">内因<b style="color:var(--danger)">${s.sumInt}</b>/外因<b style="color:var(--warning)">${s.sumExt}</b></div></div>
+                    </div>
+                </td>
+                <td style="vertical-align:top; padding:8px;">
+                     <div class="dual-score-cell">
+                        <div class="score-row" onclick="copyToClipboard('${s.avgSafetyScore}')">
+                            <span class="score-label">🛡️ 风险管控:</span><span class="score-val" style="color:${s.avgSafetyScore<100?'var(--danger)':'var(--success)'}">${s.avgSafetyScore}</span>
+                        </div>
+                        <div class="score-row" onclick="copyToClipboard('${s.avgScheduleScore}')">
+                            <span class="score-label">⏱️ 进度管控:</span><span class="score-val" style="color:${s.avgScheduleScore<60?'var(--danger)':'#333'}">${s.avgScheduleScore}</span>
+                        </div>
+                     </div>
+                </td>
+                <td style="text-align:right; vertical-align:top; padding:8px;">
+                    <div style="font-size:20px; font-weight:900; color:var(--primary); line-height:1;">${s.grade}</div>
+                    <div style="font-size:11px; color:#666; margin-top:2px;">${s.avgScore}分</div>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+    
+    function initChart(id) { if(!chartInstances[id]) chartInstances[id] = echarts.init(document.getElementById(id)); return chartInstances[id]; }
+    
+    function renderCharts(data) {
+        const stats = getStats(data);
+        if (data.length === 0) {
+            ['chartScatter','chartRadar','chartTreeMap','chartSankey','chartGantt','chartEnergy'].forEach(id => {
+                const c = initChart(id); c.clear(); c.setOption({title:{text:'暂无匹配数据',left:'center',top:'center',textStyle:{color:'#ccc'}}});
+            });
+            return;
+        }
+        renderScatter(stats); 
+        renderRadar(stats);
+        if(document.getElementById('advancedZone').style.display === 'block') { renderDeepDiveCharts(data, stats); }
+    }
+    
+    function renderScatter(stats) {
+        const chart = initChart('chartScatter');
+        const dataSeries = stats.map(s => {
+            let color, symbol, borderColor = '#fff', borderWidth = 2;
+            if (s.safetyFail) { color = COLORS.danger; symbol = 'path://M10,2 L8,0 L5,3 L2,0 L0,2 L3,5 L0,8 L2,10 L5,7 L8,10 L10,8 L7,5 Z'; borderColor = 'transparent'; borderWidth = 0; } 
+            else {
+                if (s.avgScore >= 90) { color = COLORS.success; symbol = 'pin'; } 
+                else if (s.avgScore >= 75) { color = COLORS.primary; symbol = 'circle'; } 
+                else if (s.avgScore >= 60) { color = COLORS.warning; symbol = 'triangle'; } 
+                else { color = COLORS.danger; symbol = 'rect'; }
+            }
+            return {
+                name: s.name, value: [s.customTotal, s.avgScore], 
+                symbolSize: s.safetyFail ? 24 : (18 + s.negCount * 2), symbol: symbol,
+                itemStyle: { color: color, shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.2)', borderColor: borderColor, borderWidth: borderWidth, opacity: 0.95 },
+                raw: s
+            };
+        });
+        chart.setOption({
+            backgroundColor: 'transparent', 
+            grid: { top: 30, right: 60, bottom: 30, left: 40, containLabel: true },
+            textStyle: { fontWeight: 'bold', color: '#666' },
+            tooltip: { 
+                backgroundColor: 'rgba(255,255,255,0.95)', textStyle: { color: '#333', fontSize: 13 }, 
+                formatter: p => { 
+                    const d = p.data.raw; 
+                    const safetyHtml = d.safetyFail ? `<b style="color:${COLORS.danger}">🚨 发生事故 (0分)</b>` : `<b style="color:${COLORS.success}">安全达标</b>`; 
+                    return `<div style="font-weight:700;margin-bottom:5px;font-size:14px;">${d.name}</div>${safetyHtml}<br>平均分: <b>${d.avgScore}</b><br>P1/P2: ${d.p1Cnt}/${d.p2Cnt}<br>延期(内/外): ${d.sumInt}/${d.sumExt}`; 
+                } 
+            },
+            xAxis: { name: '项目量', nameLocation: 'end', type: 'value', minInterval: 1, splitLine: { lineStyle: { type: 'dashed', color: '#e8e8e8' } } },
+            yAxis: { name: '进度分', type: 'value', max: 105, splitLine: { lineStyle: { type: 'dashed', color: '#e8e8e8' } } },
+            series: [{ type: 'scatter', data: dataSeries, label: { show: true, formatter: '{b}', position: 'top', color: '#333', fontWeight: 'bold', fontSize: 12 } }]
+        });
+        chart.off('click'); chart.on('click', function(params) { setChartFilter('manager', params.name); });
+    }
+    
+    function renderRadar(stats) {
+        const chart = initChart('chartRadar');
+        const totalAvg = [0,0,0,0,0];
+        if (stats.length) {
+            stats.forEach(s => {
+                totalAvg[0]+=s.avgScore; totalAvg[1]+=(s.safetyFail?0:100); 
+                totalAvg[2]+=(s.total>0?s.finished/s.total*100:0); 
+                totalAvg[3]+=(s.validCnt>0?s.goodCnt/s.validCnt*100:0); totalAvg[4]+=(s.total>0?s.noDelayCnt/s.total*100:0);
+            });
+            for(let i=0;i<5;i++) totalAvg[i] = Math.round(totalAvg[i]/stats.length);
+        }
+        const dataSeries = stats.map(s => ({
+            name: s.name, 
+            value: [s.avgScore, s.safetyFail?0:100, s.total>0 ? (s.finished/s.total*100) : 0, s.validCnt>0 ? (s.goodCnt/s.validCnt*100) : 0, s.total>0 ? (s.noDelayCnt/s.total*100) : 0]
+        }));
+        if(stats.length) dataSeries.unshift({ value: totalAvg, name: '平均水平', itemStyle: { color: '#95a5a6' }, lineStyle: { type: 'dashed' } });
+        chart.setOption({
+            backgroundColor: 'transparent', legend: { bottom: 0, type: 'scroll' },
+            radar: { indicator: [{name:'进度'},{name:'安全'},{name:'完成率'},{name:'优良率'},{name:'准时率'}], radius: '65%', center: ['50%', '55%'] },
+            series: [{ type: 'radar', data: dataSeries, symbol: 'circle', symbolSize: 6, areaStyle: { opacity: 0.1 } }]
+        });
+    }
+    
+    function renderDeepDiveCharts(data, stats) {
+        // ... (Charts logic kept mostly same, updated for resize)
+        const managers = stats.map(s => s.name);
+        const treeData = managers.map(mgr => ({ 
+            name: mgr, 
+            children: data.filter(p => p.manager === mgr).map(p => {
+                const dur = (new Date(p.endDate) - new Date(p.startDate)) / (1000 * 60 * 60 * 24);
+                return { 
+                    name: p.name, value: dur > 0 ? Math.ceil(dur) : 1, 
+                    itemStyle: { color: p.safety ? '#ff6b6b' : (calcScore(p)<60 ? '#f1c40f' : (calcScore(p)>=90?'#2ecc71':'#00b5ad')) } 
+                };
+            }) 
+        }));
+        const tChart = initChart('chartTreeMap');
+        tChart.setOption({ tooltip: { formatter: '{b}<br>工期: {c}天' }, series: [{ type: 'treemap', data: treeData, breadcrumb: { show: false }, label: { show: true }, itemStyle: { borderColor: '#fff', borderWidth: 2 } }] });
+        
+        // ... Sankey & Energy ...
+        const nodes = new Set(); const links = [];
+        data.forEach(p => {
+            const sc = calcScore(p);
+            let reason = ''; let linkColor = '#ccc';
+            if (p.safety) { reason = '安全事故'; linkColor = COLORS.danger; } 
+            else if (p.status === '挂起' || p.status === '终止') { reason = '异常'; linkColor = COLORS.danger; } 
+            else {
+                if (p.delayInternal > 0) { reason = '内因延期'; linkColor = COLORS.danger; } 
+                else if (p.delayExternal > 0) { reason = '外因延期'; linkColor = COLORS.warning; } 
+                else if (sc >= 90) { reason = '优质交付'; linkColor = COLORS.success; } 
+                else { reason = '正常交付'; linkColor = '#bdc3c7'; }
+            }
+            nodes.add(p.manager); nodes.add(p.status); nodes.add(reason);
+            links.push({source:p.manager, target:p.status, value:1});
+            links.push({source:p.status, target:reason, value:1, lineStyle: { color: linkColor, opacity: 0.4 }});
+        });
+        const nArr = Array.from(nodes).map(n => ({ name: n }));
+        const sChart = initChart('chartSankey');
+        sChart.setOption({ tooltip: { trigger: 'item' }, series: [{ type: 'sankey', layoutIterations: 0, data: nArr, links: links, lineStyle: { color: 'source', curveness: 0.5 } }] });
+    
+        renderGantt(data, managers);
+    
+        const eData = data.map(p => { 
+            const sc = calcScore(p) ?? 0; const lvl = p.lLevel || 'P3';
+            return { 
+                name: p.name, value: [lvl, sc, p.manager], 
+                itemStyle: { color: lvl==='P1'?COLORS.p1:(lvl==='P2'?COLORS.p2:(lvl==='P3'?COLORS.p3:(lvl==='P4'?COLORS.p4:COLORS.p5))), shadowBlur: 0, borderColor: '#fff', borderWidth: 1, opacity: 0.8 },
+                raw: p
+            }; 
+        });
+        const eChart = initChart('chartEnergy');
+        eChart.setOption({
+            tooltip: { backgroundColor: 'rgba(255,255,255,0.95)', formatter: p => `${p.data.raw.name}<br>Prior: ${p.value[0]}<br>Score: ${p.value[1]}` },
+            xAxis: { type: 'category', data: ['P1','P2','P3','P4','P5'] }, yAxis: { min: 0, max: 105, splitLine: { show: true } }, 
+            series: [{ type: 'scatter', data: eData, symbolSize: 14, markLine: { silent: true, data: [ { yAxis: 60 } ] } }] 
+        });
+    }
+    
+    function renderGantt(data, managers) {
+        const gData = [];
+        data.forEach(p => {
+            if(p.startDate && p.endDate) {
+                const midx = managers.indexOf(p.manager);
+                if(midx>-1) gData.push({ name: p.name, value: [midx, p.startDate, p.endDate, p.status], itemStyle: { color: p.status==='已完结'?'#2ecc71':(p.status.includes('交付')?'#3498db':'#bdc3c7'), borderRadius: 4 } });
+            }
+        });
+        const gChart = initChart('chartGantt');
+        gChart.setOption({
+            tooltip: { formatter: p => `${p.name}<br>${p.value[1]}~${p.value[2]}` }, grid: { left:10, right:10, bottom:20, containLabel:true }, xAxis: { type: 'time' }, yAxis: { type: 'category', data: managers },
+            series: [{ type: 'custom', encode:{x:[1,2], y:0}, renderItem: (params, api) => {
+                    const catIdx = api.value(0); const start = api.coord([api.value(1), catIdx]); const end = api.coord([api.value(2), catIdx]); const height = 18;
+                    return { type: 'rect', shape: { x: start[0], y: start[1] - height/2, width: end[0] - start[0], height: height, r:4 }, style: api.style() };
+                }, data: gData, markLine: { symbol: ['none', 'none'], data: [ { xAxis: new Date() } ] }
+            }]
+        });
+    }
+    
+    function openMgmtModal() { document.getElementById('mgmtOverlay').style.display = 'block'; }
+    function closeMgmtModal() { document.getElementById('mgmtOverlay').style.display = 'none'; }
+    function switchMgmtTab(tabId) {
+        document.querySelectorAll('.mgmt-nav-item').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.mgmt-content').forEach(el => el.classList.remove('active'));
+        event.currentTarget.classList.add('active');
+        document.getElementById('tab-' + tabId).classList.add('active');
+    }
+    
+    function exportJSON() {
+        const jsonStr = JSON.stringify({ "__META__": { "version": "v20.3", "exportDate": new Date().toISOString() }, "data": projects }, null, 2);
+        const link = document.createElement('a'); 
+        link.href = URL.createObjectURL(new Blob(["\ufeff" + jsonStr], {type: 'application/json'})); 
+        link.download = `PM_Dashboard_Backup_${new Date().toISOString().split('T')[0]}.json`; link.click();
+    }
+    
+    // --- CORE LOGIC: SMART UPSERT ---
+    function performSmartMerge(incomingData) {
+        let updateCount = 0;
+        let addCount = 0;
+        
+        // Map existing projects by Code for fast lookup
+        const projectMap = new Map(projects.map(p => [p.code, p]));
+        
+        incomingData.forEach(newItem => {
+            if (projectMap.has(newItem.code)) {
+                // UPDATE: Project exists, update fields
+                const oldItem = projectMap.get(newItem.code);
+                
+                // Preserve internal UID but update business fields
+                // We use Object.assign but ensure _uid remains if not present in new item (though it usually is)
+                // Actually, simply overwriting properties is what we want for "Sync"
+                // But let's be safe about _uid.
+                const originalUid = oldItem._uid;
+                Object.assign(oldItem, newItem);
+                // Ensure consistency just in case
+                if(!oldItem._uid) oldItem._uid = originalUid; 
+                
+                updateCount++;
+            } else {
+                // ADD: New project
+                if(!newItem._uid) newItem._uid = generateUUID();
+                projects.push(newItem);
+                projectMap.set(newItem.code, newItem); // Update map to handle duplicates within the incoming file itself
+                addCount++;
+            }
+        });
+        
+        persistData();
+        closeMgmtModal();
+        alert(`✅ 智能同步完成！\n\n🔄 更新旧项目：${updateCount} 个\n➕ 新增新项目：${addCount} 个`);
+    }
+    
+    function importJSONFile(input) {
+        const file = input.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const json = JSON.parse(e.target.result);
+                if(json.data && Array.isArray(json.data)) {
+                    const choice = prompt(`📦 数据恢复选项\n\n检测到文件包含 ${json.data.length} 条记录。\n请选择恢复模式 (输入 1 或 2)：\n\n[1] 🚨 覆盖模式 (Overwrite)\n      清空当前所有数据，完全替换为备份数据。\n\n[2] 🔄 智能合并 (Smart Sync)\n      有则更新，无则新增。(推荐)`, "2");
+                    
+                    if (choice === "1") {
+                         if(confirm("⚠️ 高危警告\n\n您即将清空当前看板的所有数据并用备份文件替换。\n此操作不可撤销！\n\n确定继续吗？")) {
+                             pushHistory(); 
+                             projects = json.data; 
+                             persistData(); 
+                             closeMgmtModal(); 
+                             alert("✅ 全量覆盖恢复成功！"); 
+                         }
+                    } else if (choice === "2") {
+                        pushHistory(); 
+                        performSmartMerge(json.data);
+                    }
+                } else alert("无效文件！缺少 data 字段。");
+            } catch(err) { alert("失败：" + err); }
+            input.value = '';
+        };
+        reader.readAsText(file, 'UTF-8');
+    }
+    
+    function exportExcel() {
+        // v20.3: Updated to match input schema perfectly
+        const ws_data = [["商机编号", "交付经理", "项目名称", "L-Level", "状态", "开始时间", "结束时间", "内因延期", "外因延期", "安全事故", "审批情况", "备注", "当前得分"]];
+        projects.forEach(p => {
+            const s = calcScore(p);
+            ws_data.push([
+                p.code, 
+                p.manager, 
+                p.name, 
+                p.lLevel||'P3', 
+                p.status, 
+                p.startDate, 
+                p.endDate, 
+                p.delayInternal, 
+                p.delayExternal, 
+                p.safety?'是':'否', 
+                p.approval, 
+                p.note, 
+                s === null ? '不计' : s
+            ]);
+        });
+        const ws = XLSX.utils.aoa_to_sheet(ws_data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "项目台账");
+        XLSX.writeFile(wb, `项目履约报表_${new Date().toISOString().split('T')[0]}.xlsx`);
+    }
+    
+    // --- v20.3 核心升级：Excel 智能差量合并 (Smart Merge) ---
+    function importExcelFile(input) {
+        const file = input.files[0];
+        if(!file) return;
+    
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array', codepage: 65001});
+                
+                // 1. 自动合并所有 Sheet (应对每个经理一个 Sheet 的情况)
+                let allRows = [];
+                workbook.SheetNames.forEach(sheetName => {
+                    const sheet = workbook.Sheets[sheetName];
+                    // raw: false 尝试将内容解析为格式化后的字符串 (处理日期)
+                    const json = XLSX.utils.sheet_to_json(sheet, {raw: false, dateNF:'yyyy-mm-dd'});
+                    allRows = allRows.concat(json);
+                });
+    
+                if(allRows.length === 0) { alert("Excel 中没有数据！"); return; }
+    
+                // 2. 准备合并统计
+                let stats = { updated: 0, added: 0, skipped: 0 };
+    
+                // 3. 建立现有项目的哈希索引 (Key = Code) 极大提升查找速度
+                const projectMap = new Map();
+                projects.forEach((p, index) => {
+                    if(p.code) projectMap.set(p.code, index);
+                });
+    
+                // 4. 开始遍历 Excel 行
+                pushHistory(); // 操作前先存快照，允许撤销
+                
+                allRows.forEach(row => {
+                    // 必填项校验：没有经理名或项目名的行直接跳过
+                    if(!row['交付经理'] || !row['项目名称']) {
+                        return; 
+                    }
+    
+                    // 提取 Excel 数据并清洗 (Trim 去除空格，处理默认值)
+                    // 注意：这里必须与上方设计的 Excel 表头完全一致
+                    const excelCode = row['商机编号'] ? String(row['商机编号']).trim() : null;
+                    
+                    const newRecord = {
+                        manager: row['交付经理'],
+                        name: row['项目名称'],
+                        lLevel: row['L-Level'] || 'P3', // 默认 P3
+                        status: row['状态'] || '交付中',
+                        startDate: row['开始时间'] || '',
+                        endDate: row['结束时间'] || '',
+                        // 支持 "审批" 或 "审批情况"
+                        approval: row['审批情况'] || row['审批'] || '未通过/无',
+                        // 数字处理：转整型，非数字归0
+                        delayInternal: parseInt(row['内因延期']) || 0,
+                        delayExternal: parseInt(row['外因延期']) || 0,
+                        // 布尔值处理：识别 "是" 或 "Yes"
+                        safety: (row['安全事故'] === '是' || row['安全事故'] === 'Yes'),
+                        note: row['备注'] || ''
+                    };
+    
+                    if (excelCode && projectMap.has(excelCode)) {
+                        // === 情况 A: 项目已存在 -> 执行更新 (Smart Update) ===
+                        const idx = projectMap.get(excelCode);
+                        
+                        // 保留原有的 _uid 和 code，只更新业务字段
+                        const originalUID = projects[idx]._uid;
+                        projects[idx] = { 
+                            ...newRecord, 
+                            code: excelCode, 
+                            _uid: originalUID 
+                        };
+                        stats.updated++;
+                    } else {
+                        // === 情况 B: 项目不存在或无编号 -> 执行新增 (Add) ===
+                        // 如果 Excel 里没填编号，自动生成一个
+                        const finalCode = excelCode || generateNewCode();
+                        
+                        // 再次检查生成的新 Code 是否冲突 (极小概率)
+                        if(projectMap.has(finalCode)) {
+                            stats.skipped++; // 放弃冲突项
+                        } else {
+                            newRecord.code = finalCode;
+                            newRecord._uid = generateUUID(); // 生成内部 ID
+                            projects.push(newRecord);
+                            projectMap.set(finalCode, projects.length - 1); // 更新索引
+                            stats.added++;
+                        }
+                    }
+                });
+    
+                persistData(); // 保存入库
+                closeMgmtModal(); // 关闭弹窗
+                
+                // 5. 反馈结果
+                const msg = `📊 导入分析报告\n────────────────\n` +
+                            `✅ 更新旧项目：${stats.updated} 条\n` +
+                            `➕ 新增新项目：${stats.added} 条\n` +
+                            `⚪ 跳过/无效项：${stats.skipped} 条\n\n` +
+                            `现在看板已是 Excel 中的最新状态。`;
+                alert(msg);
+    
+            } catch(err) { 
+                console.error(err);
+                alert("Excel 解析失败！请检查文件格式是否标准。\n\n错误信息: " + err.message); 
+            }
+            input.value = ''; // 重置文件框，允许重复导入
+        };
+        reader.readAsArrayBuffer(file);
+    }
+    
+    function persistData(isRestore = false) { 
+        localStorage.setItem('pm_data_backup_v19_5', JSON.stringify(projects)); 
+        idbHelper.saveAll(projects).catch(console.warn); 
+        refreshUI();
+        if(isRestore) updateUndoButton(); 
+    }
+    
+    function resetData(mode) {
+        if(prompt("⚠️ 敏感操作！\n密码：") === "123456789") {
+            if(mode === 'empty') projects = [];
+            else generateDemoData();
+            persistData(); closeMgmtModal(); alert("操作成功。");
+        }
+    }
+    
+    window.onresize = function() {
+        if (typeof chartInstances !== 'undefined') {
+            Object.values(chartInstances).forEach(c => { if (c && typeof c.resize === 'function') c.resize(); });
+        }
+    };
+    
+    initApp();
+</script>
+</body>
+</html>
