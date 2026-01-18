@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>项目履约监控看板 (v20.3.2 Governance)</title>
+    <title>项目履约监控看板 (v20.3.3 Governance)</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <style>
@@ -36,27 +36,27 @@
         body { 
             font-family: -apple-system, "Microsoft YaHei", "Segoe UI", sans-serif; 
             background: var(--bg); color: var(--text-main); 
-            margin: 0; padding: 8px; /* Compact: Reduced padding */
-            line-height: 1.4; font-size: 13px; /* Compact: Smaller base font */
+            margin: 0; padding: 8px; 
+            line-height: 1.4; font-size: 13px; 
         }
         .container { max-width: 100%; margin: 0 auto; overflow-x: hidden; }
     
         /* Header */
         header { 
-            background: var(--card-bg); padding: 8px 16px; /* Compact */
+            background: var(--card-bg); padding: 8px 16px; 
             border-radius: 6px; 
             box-shadow: var(--shadow-sm); display: flex; justify-content: space-between; 
-            align-items: center; margin-bottom: 8px; border-left: 4px solid var(--secondary); /* Compact */
+            align-items: center; margin-bottom: 8px; border-left: 4px solid var(--secondary); 
             flex-wrap: nowrap; gap: 16px; overflow: hidden; white-space: nowrap;
         }
         h1 { 
-            margin: 0; font-size: 18px; /* Compact */
+            margin: 0; font-size: 18px; 
             font-weight: 800; color: #002329; 
             display: flex; align-items: center; gap: 10px; letter-spacing: -0.5px; 
             flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; 
         }
         .subtitle { 
-            font-size: 11px; color: #fff; background: var(--p1-color); padding: 2px 6px; /* Compact */
+            font-size: 11px; color: #fff; background: var(--p1-color); padding: 2px 6px; 
             border-radius: 4px; font-weight: 600; text-transform: uppercase; margin-left: 5px;
             box-shadow: 0 2px 4px rgba(245, 34, 45, 0.3);
         }
@@ -64,7 +64,7 @@
         .header-controls { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
         
         .btn { 
-            border: none; padding: 4px 10px; /* Compact */
+            border: none; padding: 4px 10px; 
             border-radius: 4px; cursor: pointer; 
             font-size: 12px; font-weight: 600; transition: all 0.3s; 
             display: inline-flex; align-items: center; gap: 4px; 
@@ -82,20 +82,20 @@
         .btn-dark:hover { background: #2c3e50; }
     
         .section { 
-            background: var(--card-bg); padding: 10px; /* Compact */
+            background: var(--card-bg); padding: 10px; 
             border-radius: 6px; box-shadow: var(--shadow-sm); 
-            margin-bottom: 8px; /* Compact */
+            margin-bottom: 8px; 
             border: 1px solid #f0f0f0; position: relative; 
         }
         .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
-        .section-title { font-size: 14px; /* Compact */ font-weight: 700; border-left: 3px solid var(--primary); padding-left: 8px; color: #262626; display: flex; align-items: center; gap: 8px; }
+        .section-title { font-size: 14px; font-weight: 700; border-left: 3px solid var(--primary); padding-left: 8px; color: #262626; display: flex; align-items: center; gap: 8px; }
         .section-tag { font-size: 10px; background: #f0f0f0; color: #666; padding: 1px 5px; border-radius: 4px; font-weight: normal; margin-left: 8px; }
     
-        .chart-container { display: flex; gap: 10px; height: 360px; /* Compact: Reduced height */ }
+        .chart-container { display: flex; gap: 10px; height: 360px; }
         .chart-wrapper { flex: 1; display: flex; flex-direction: column; border: 1px solid #f0f0f0; border-radius: 6px; background: #fff; overflow: hidden; transition: 0.3s; }
         .chart-wrapper:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.05); border-color: #d9d9d9; }
         .chart-box { flex: 1; padding: 8px; min-height: 0; }
-        .chart-footer { background: #fafafa; border-top: 1px solid #eee; padding: 6px 10px; font-size: 11px; color: var(--text-sub); } /* Compact */
+        .chart-footer { background: #fafafa; border-top: 1px solid #eee; padding: 6px 10px; font-size: 11px; color: var(--text-sub); }
         .chart-footer h4 { margin: 0 0 4px 0; font-size: 12px; color: #333; font-weight: 700; display: flex; align-items: center; gap: 6px; }
     
         .collapse-bar { background: #fff; border: 1px dashed #d9d9d9; color: var(--primary); padding: 4px; text-align: center; border-radius: 4px; cursor: pointer; font-weight: 700; font-size: 12px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.3s; }
@@ -111,11 +111,10 @@
             box-shadow: inset 0 2px 6px rgba(0,0,0,0.02);
         }
     
-        /* 强制不换行，开启横向滚动 */
-        table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; /* Compact */ background: #fff; table-layout: fixed; }
+        table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; background: #fff; table-layout: fixed; }
         
         thead th { 
-            background: #fafafa; padding: 6px 8px; /* Compact */
+            background: #fafafa; padding: 6px 8px; 
             text-align: left; 
             border-bottom: 1px solid var(--border); border-right: 1px solid #f0f0f0; 
             color: #595959; font-weight: 600; cursor: pointer; white-space: nowrap; 
@@ -123,7 +122,7 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
         
-        td { padding: 4px 8px; /* Compact */ border-bottom: 1px solid #f0f0f0; color: #262626; vertical-align: middle; border-right: 1px solid #fafafa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        td { padding: 4px 8px; border-bottom: 1px solid #f0f0f0; color: #262626; vertical-align: middle; border-right: 1px solid #fafafa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         tbody tr:hover { background-color: #e6fffb !important; }
         .row-meltdown td { background-color: #fff1f0 !important; color: #cf1322 !important; font-weight: 700; }
         
@@ -135,11 +134,11 @@
             background-color: #d9d9d9; color: #595959; border-color: #b7b7b7; text-decoration: line-through;
         }
         .stale-badge {
-            font-size: 10px; color: #d46b08; border: 1px solid #d46b08; padding: 0px 2px; /* Compact */
+            font-size: 10px; color: #d46b08; border: 1px solid #d46b08; padding: 0px 2px;
             border-radius: 3px; margin-left: 4px; vertical-align: text-bottom; cursor: help; font-weight: normal;
         }
     
-        /* --- New Checkbox & Code Styles --- */
+        /* Checkbox & Code Styles */
         .check-col { width: 30px; text-align: center; }
         .clickable-code {
             cursor: pointer;
@@ -203,7 +202,6 @@
         .l-p4 { background: var(--p4-color); }
         .l-p5 { background: var(--p5-color); text-decoration: line-through; }
         
-        /* New Legend Tags for Charts */
         .dot { display: inline-block; width:6px; height:6px; border-radius:50%; margin-right:3px; }
         .rect-mark { display: inline-block; width:8px; height:8px; border-radius:2px; margin-right:3px; vertical-align:middle; }
         
@@ -212,7 +210,7 @@
         }
         .team-stat-bar {
             flex: 1; background: #fff; border: 1px solid #e8e8e8; border-radius: 4px;
-            padding: 0 12px; height: 32px; /* Compact */
+            padding: 0 12px; height: 32px; 
             display: flex; align-items: center; justify-content: space-between;
             box-shadow: 0 1px 3px rgba(0,0,0,0.02); transition: 0.2s;
         }
@@ -318,7 +316,7 @@
 
 <div class="container">
     <header>
-        <h1>🚀 项目履约监控看板 <span class="subtitle">v20.3.2 Governance</span></h1>
+        <h1>🚀 项目履约监控看板 <span class="subtitle">v20.3.3 Governance</span></h1>
         <div class="header-controls">
             <!-- [New] Undo Button -->
             <button class="btn btn-outline" id="btnUndo" onclick="undoLastAction()" disabled style="margin-right:8px;">↩ 撤销 (0)</button>
@@ -685,11 +683,16 @@
                     <option value="终止">终止</option>
                 </select>
             </div>
+            
+            <!-- [Fixed] Split Approval Options -->
             <div class="form-item"><label class="form-label">挂起/终止审批</label>
                 <select class="form-input" id="f_approval" onchange="autoCalc()">
-                    <option value="未通过/无">未通过/无</option><option value="已通过">已通过</option>
+                    <option value="无">无 (未发起)</option>
+                    <option value="未通过">未通过 (已驳回)</option>
+                    <option value="已通过">已通过</option>
                 </select>
             </div>
+            
             <div class="form-item"><label class="form-label">内因延期 (次) [-35分]</label><input type="number" min="0" class="form-input" id="f_delayInternal" value="0" oninput="autoCalc()"></div>
             <div class="form-item"><label class="form-label">外因延期 (次) [-5分]</label><input type="number" min="0" class="form-input" id="f_delayExternal" value="0" oninput="autoCalc()"></div>
             <div class="form-item full"><label class="form-label" style="color:var(--danger); font-weight:800;">🚨 安全责任事故 (一票否决)</label>
@@ -787,7 +790,7 @@
         p5: '#595959'
     };
 
-    const DB_NAME = 'PM_Dashboard_v20_2';
+    const DB_NAME = 'PM_Dashboard_v20_3_3';
     const DB_VERSION = 1;
     const STORE_NAME = 'projects';
     
@@ -1096,7 +1099,8 @@
         document.getElementById('f_code').value = generateNewCode();
         
         document.getElementById('f_status').value = '交付中';
-        document.getElementById('f_approval').value = '未通过/无';
+        // [Updated] Default to "无"
+        document.getElementById('f_approval').value = '无';
         document.getElementById('f_lLevel').value = 'P3';
         document.getElementById('f_delayInternal').value = 0;
         document.getElementById('f_delayExternal').value = 0;
@@ -1121,7 +1125,12 @@
         document.getElementById('f_startDate').value = p.startDate;
         document.getElementById('f_endDate').value = p.endDate;
         document.getElementById('f_status').value = p.status;
-        document.getElementById('f_approval').value = p.approval;
+        
+        // [Fixed] Handle legacy values if any
+        let appVal = p.approval;
+        if(appVal === '未通过/无') appVal = '无'; // Compatibility mapping
+        document.getElementById('f_approval').value = appVal;
+        
         document.getElementById('f_lLevel').value = p.lLevel || 'P3';
         document.getElementById('f_delayInternal').value = p.delayInternal;
         document.getElementById('f_delayExternal').value = p.delayExternal;
@@ -1394,7 +1403,7 @@
     }
     
     function loadFallbackOrDemo() {
-        const local = localStorage.getItem('pm_data_backup_v19_5'); 
+        const local = localStorage.getItem('pm_data_backup_v20_3_3'); 
         if(local) {
              projects = JSON.parse(local).map(p => ({...p, lLevel: p.lLevel || 'P3'}));
         } else generateDemoData();
@@ -1416,7 +1425,8 @@
             const statusRoll = Math.random();
             let status = rand(activeStatuses);
             let lLevel = 'P3';
-            let approval = '未通过/无';
+            // [Updated] Default to '无'
+            let approval = '无';
             
             if (statusRoll < 0.3) status = '已完结';
             else if (statusRoll < 0.4) { status = '挂起'; lLevel = 'P4'; }
@@ -1889,7 +1899,7 @@
     }
     
     function exportJSON() {
-        const jsonStr = JSON.stringify({ "__META__": { "version": "v20.3", "exportDate": new Date().toISOString() }, "data": projects }, null, 2);
+        const jsonStr = JSON.stringify({ "__META__": { "version": "v20.3.3", "exportDate": new Date().toISOString() }, "data": projects }, null, 2);
         const link = document.createElement('a'); 
         link.href = URL.createObjectURL(new Blob(["\ufeff" + jsonStr], {type: 'application/json'})); 
         link.download = `PM_Dashboard_Backup_${new Date().toISOString().split('T')[0]}.json`; link.click();
@@ -1900,29 +1910,19 @@
         let updateCount = 0;
         let addCount = 0;
         
-        // Map existing projects by Code for fast lookup
         const projectMap = new Map(projects.map(p => [p.code, p]));
         
         incomingData.forEach(newItem => {
             if (projectMap.has(newItem.code)) {
-                // UPDATE: Project exists, update fields
                 const oldItem = projectMap.get(newItem.code);
-                
-                // Preserve internal UID but update business fields
-                // We use Object.assign but ensure _uid remains if not present in new item (though it usually is)
-                // Actually, simply overwriting properties is what we want for "Sync"
-                // But let's be safe about _uid.
                 const originalUid = oldItem._uid;
                 Object.assign(oldItem, newItem);
-                // Ensure consistency just in case
                 if(!oldItem._uid) oldItem._uid = originalUid; 
-                
                 updateCount++;
             } else {
-                // ADD: New project
                 if(!newItem._uid) newItem._uid = generateUUID();
                 projects.push(newItem);
-                projectMap.set(newItem.code, newItem); // Update map to handle duplicates within the incoming file itself
+                projectMap.set(newItem.code, newItem);
                 addCount++;
             }
         });
@@ -1963,7 +1963,7 @@
     
     function exportExcel() {
         // v20.3: Updated to match input schema perfectly
-        const ws_data = [["商机编号", "交付经理", "项目名称", "L-Level", "状态", "开始时间", "结束时间", "内因延期", "外因延期", "安全事故", "审批情况", "备注", "当前得分"]];
+        const ws_data = [["商机编号", "交付经理", "项目名称", "L-Level", "状态", "开始时间", "结束时间", "内因延期", "外因延期", "安全事故", "审批", "备注", "当前得分"]];
         projects.forEach(p => {
             const s = calcScore(p);
             ws_data.push([
@@ -1999,61 +1999,48 @@
                 const data = new Uint8Array(e.target.result);
                 const workbook = XLSX.read(data, {type: 'array', codepage: 65001});
                 
-                // 1. 自动合并所有 Sheet (应对每个经理一个 Sheet 的情况)
                 let allRows = [];
                 workbook.SheetNames.forEach(sheetName => {
                     const sheet = workbook.Sheets[sheetName];
-                    // raw: false 尝试将内容解析为格式化后的字符串 (处理日期)
                     const json = XLSX.utils.sheet_to_json(sheet, {raw: false, dateNF:'yyyy-mm-dd'});
                     allRows = allRows.concat(json);
                 });
     
                 if(allRows.length === 0) { alert("Excel 中没有数据！"); return; }
     
-                // 2. 准备合并统计
                 let stats = { updated: 0, added: 0, skipped: 0 };
     
-                // 3. 建立现有项目的哈希索引 (Key = Code) 极大提升查找速度
                 const projectMap = new Map();
                 projects.forEach((p, index) => {
                     if(p.code) projectMap.set(p.code, index);
                 });
     
-                // 4. 开始遍历 Excel 行
-                pushHistory(); // 操作前先存快照，允许撤销
+                pushHistory(); 
                 
                 allRows.forEach(row => {
-                    // 必填项校验：没有经理名或项目名的行直接跳过
                     if(!row['交付经理'] || !row['项目名称']) {
                         return; 
                     }
     
-                    // 提取 Excel 数据并清洗 (Trim 去除空格，处理默认值)
-                    // 注意：这里必须与上方设计的 Excel 表头完全一致
                     const excelCode = row['商机编号'] ? String(row['商机编号']).trim() : null;
                     
                     const newRecord = {
                         manager: row['交付经理'],
                         name: row['项目名称'],
-                        lLevel: row['L-Level'] || 'P3', // 默认 P3
+                        lLevel: row['L-Level'] || 'P3', 
                         status: row['状态'] || '交付中',
                         startDate: row['开始时间'] || '',
                         endDate: row['结束时间'] || '',
-                        // 支持 "审批" 或 "审批情况"
-                        approval: row['审批情况'] || row['审批'] || '未通过/无',
-                        // 数字处理：转整型，非数字归0
+                        // [Updated] Enhanced Approval Parsing logic
+                        approval: row['审批情况'] || row['审批'] || '无',
                         delayInternal: parseInt(row['内因延期']) || 0,
                         delayExternal: parseInt(row['外因延期']) || 0,
-                        // 布尔值处理：识别 "是" 或 "Yes"
                         safety: (row['安全事故'] === '是' || row['安全事故'] === 'Yes'),
                         note: row['备注'] || ''
                     };
     
                     if (excelCode && projectMap.has(excelCode)) {
-                        // === 情况 A: 项目已存在 -> 执行更新 (Smart Update) ===
                         const idx = projectMap.get(excelCode);
-                        
-                        // 保留原有的 _uid 和 code，只更新业务字段
                         const originalUID = projects[idx]._uid;
                         projects[idx] = { 
                             ...newRecord, 
@@ -2062,27 +2049,22 @@
                         };
                         stats.updated++;
                     } else {
-                        // === 情况 B: 项目不存在或无编号 -> 执行新增 (Add) ===
-                        // 如果 Excel 里没填编号，自动生成一个
                         const finalCode = excelCode || generateNewCode();
-                        
-                        // 再次检查生成的新 Code 是否冲突 (极小概率)
                         if(projectMap.has(finalCode)) {
-                            stats.skipped++; // 放弃冲突项
+                            stats.skipped++; 
                         } else {
                             newRecord.code = finalCode;
-                            newRecord._uid = generateUUID(); // 生成内部 ID
+                            newRecord._uid = generateUUID(); 
                             projects.push(newRecord);
-                            projectMap.set(finalCode, projects.length - 1); // 更新索引
+                            projectMap.set(finalCode, projects.length - 1); 
                             stats.added++;
                         }
                     }
                 });
     
-                persistData(); // 保存入库
-                closeMgmtModal(); // 关闭弹窗
+                persistData(); 
+                closeMgmtModal(); 
                 
-                // 5. 反馈结果
                 const msg = `📊 导入分析报告\n────────────────\n` +
                             `✅ 更新旧项目：${stats.updated} 条\n` +
                             `➕ 新增新项目：${stats.added} 条\n` +
@@ -2094,13 +2076,13 @@
                 console.error(err);
                 alert("Excel 解析失败！请检查文件格式是否标准。\n\n错误信息: " + err.message); 
             }
-            input.value = ''; // 重置文件框，允许重复导入
+            input.value = ''; 
         };
         reader.readAsArrayBuffer(file);
     }
     
     function persistData(isRestore = false) { 
-        localStorage.setItem('pm_data_backup_v19_5', JSON.stringify(projects)); 
+        localStorage.setItem('pm_data_backup_v20_3_3', JSON.stringify(projects)); 
         idbHelper.saveAll(projects).catch(console.warn); 
         refreshUI();
         if(isRestore) updateUndoButton(); 
